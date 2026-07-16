@@ -1,0 +1,175 @@
+/**
+ * Typed API wrapper for calling the FastAPI backend.
+ * Automatically injects the Supabase auth token.
+ */
+
+import { createClient } from "./supabaseClient";
+import type {
+  CreateProjectRequest,
+  CreateProjectResponse,
+  ProjectListResponse,
+  ProjectDetailResponse,
+  ProjectStatusResponse,
+  TranscribeRequest,
+  TranslateRequest,
+  StyleRequest,
+  ExportRequest,
+  SubtitleStyle,
+} from "./types";
+
+const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
+
+async function getAuthHeaders(): Promise<Record<string, string>> {
+  const supabase = createClient();
+  const {
+    data: { session },
+  } = await supabase.auth.getSession();
+
+  if (!session?.access_token) {
+    throw new Error("Not authenticated");
+  }
+
+  return {
+    Authorization: `Bearer ${session.access_token}`,
+    "Content-Type": "application/json",
+  };
+}
+
+async function apiFetch<T>(
+  path: string,
+  options: RequestInit = {}
+): Promise<T> {
+  const headers = await getAuthHeaders();
+  const response = await fetch(`${API_URL}${path}`, {
+    ...options,
+    headers: {
+      ...headers,
+      ...(options.headers || {}),
+    },
+  });
+
+  if (!response.ok) {
+    const error = await response.json().catch(() => ({ detail: "Unknown error" }));
+    throw new Error(error.detail || `API error: ${response.status}`);
+  }
+
+  return response.json();
+}
+
+// ── Project APIs ────────────────────────────────────────────────────────────
+
+export async function createProject(
+  data: CreateProjectRequest
+): Promise<CreateProjectResponse> {
+  return apiFetch<CreateProjectResponse>("/projects", {
+    method: "POST",
+    body: JSON.stringify(data),
+  });
+}
+
+export async function listProjects(): Promise<ProjectListResponse> {
+  return apiFetch<ProjectListResponse>("/projects");
+}
+
+export async function getProject(
+  projectId: string
+): Promise<ProjectDetailResponse> {
+  return apiFetch<ProjectDetailResponse>(`/projects/${projectId}`);
+}
+
+export async function getProjectStatus(
+  projectId: string
+): Promise<ProjectStatusResponse> {
+  return apiFetch<ProjectStatusResponse>(`/projects/${projectId}/status`);
+}
+
+// ── Transcription APIs ──────────────────────────────────────────────────────
+
+export async function startTranscription(
+  projectId: string,
+  data: TranscribeRequest = {}
+): Promise<{ job_id: string; message: string }> {
+  return apiFetch(`/projects/${projectId}/transcribe`, {
+    method: "POST",
+    body: JSON.stringify(data),
+  });
+}
+
+// ── Translation APIs ────────────────────────────────────────────────────────
+
+export async function startTranslation(
+  projectId: string,
+  data: TranslateRequest
+): Promise<{ job_id: string; message: string }> {
+  return apiFetch(`/projects/${projectId}/translate`, {
+    method: "POST",
+    body: JSON.stringify(data),
+  });
+}
+
+// ── Style APIs ──────────────────────────────────────────────────────────────
+
+export async function saveStyle(
+  projectId: string,
+  data: StyleRequest
+): Promise<SubtitleStyle> {
+  return apiFetch<SubtitleStyle>(`/projects/${projectId}/style`, {
+    method: "POST",
+    body: JSON.stringify(data),
+  });
+}
+
+export async function getStyle(
+  projectId: string
+): Promise<SubtitleStyle | null> {
+  return apiFetch<SubtitleStyle | null>(`/projects/${projectId}/style`);
+}
+
+// ── Export APIs ──────────────────────────────────────────────────────────────
+
+export async function startExport(
+  projectId: string,
+  data: ExportRequest
+): Promise<{ job_id: string; message: string }> {
+  return apiFetch(`/projects/${projectId}/export`, {
+    method: "POST",
+    body: JSON.stringify(data),
+  });
+}
+
+export async function listExports(
+  projectId: string
+): Promise<{ exports: import("./types").ExportRecord[] }> {
+  return apiFetch(`/projects/${projectId}/exports`);
+}
+
+// ── Upload Helper ───────────────────────────────────────────────────────────
+
+export async function uploadVideoToR2(
+  presignedUrl: string,
+  file: File,
+  onProgress?: (percent: number) => void
+): Promise<void> {
+  return new Promise((resolve, reject) => {
+    const xhr = new XMLHttpRequest();
+    xhr.open("PUT", presignedUrl);
+    xhr.setRequestHeader("Content-Type", file.type || "video/mp4");
+
+    xhr.upload.addEventListener("progress", (e) => {
+      if (e.lengthComputable && onProgress) {
+        onProgress(Math.round((e.loaded / e.total) * 100));
+      }
+    });
+
+    xhr.addEventListener("load", () => {
+      if (xhr.status >= 200 && xhr.status < 300) {
+        resolve();
+      } else {
+        reject(new Error(`Upload failed with status ${xhr.status}`));
+      }
+    });
+
+    xhr.addEventListener("error", () => reject(new Error("Upload failed")));
+    xhr.send(file);
+  });
+}
