@@ -1,7 +1,7 @@
 "use client";
 
-import { useEffect, useState } from "react";
-import { useParams, useRouter } from "next/navigation";
+import { Suspense, useEffect, useState } from "react";
+import { useSearchParams, useRouter } from "next/navigation";
 import {
   getProject,
   startTranscription,
@@ -24,10 +24,10 @@ import LanguageSelector from "@/components/LanguageSelector";
 import ExportPanel from "@/components/ExportPanel";
 import JobStatusBadge from "@/components/JobStatusBadge";
 
-export default function ProjectPage() {
-  const params = useParams();
+function ProjectEditor() {
+  const searchParams = useSearchParams();
   const router = useRouter();
-  const projectId = params.id as string;
+  const projectId = searchParams.get("id") as string;
 
   const [project, setProject] = useState<ProjectDetailResponse | null>(null);
   const [loading, setLoading] = useState(true);
@@ -501,5 +501,13 @@ export default function ProjectPage() {
         )}
       </div>
     </div>
+  );
+}
+
+export default function ProjectPage() {
+  return (
+    <Suspense fallback={<div className="p-8 text-center">Loading project...</div>}>
+      <ProjectEditor />
+    </Suspense>
   );
 }

@@ -34,7 +34,7 @@ export default function DashboardPage() {
     setCreating(true);
     try {
       const project = await createProject({ title: newTitle });
-      router.push(`/project/${project.id}`);
+      router.push(`/project?id=${project.id}`);
     } catch (err) {
       console.error("Failed to create project:", err);
     } finally {
@@ -207,7 +207,7 @@ export default function DashboardPage() {
                 textAlign: "left",
                 width: "100%",
               }}
-              onClick={() => router.push(`/project/${project.id}`)}
+              onClick={() => router.push(`/project?id=${project.id}`)}
             >
               {/* Thumbnail placeholder */}
               <div
