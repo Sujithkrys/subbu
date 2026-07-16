@@ -15,7 +15,7 @@ from fastapi import APIRouter, Request
 
 from db.supabase_client import (
     get_project, get_transcript, update_job,
-    update_project_status, save_transcript,
+    update_project_status, save_transcript, increment_usage,
 )
 from services.translation_service import translate_segments
 
@@ -63,6 +63,14 @@ async def process_translation(request: Request):
         # Step 4: Update job and project status
         update_job(job_id, "done", progress=100)
         update_project_status(project_id, "ready")
+
+        # Step 4.5: Increment usage limits
+        try:
+            char_count = sum(len(seg.get("text", "")) for seg in segments)
+            project = get_project(project_id)
+            increment_usage(project["user_id"], translation_characters=char_count)
+        except Exception as e:
+            print(f"Warning: Failed to increment translation usage: {e}")
 
         return {
             "status": "success",

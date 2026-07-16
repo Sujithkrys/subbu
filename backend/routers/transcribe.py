@@ -48,6 +48,15 @@ async def start_transcription(
     if project["user_id"] != user_id:
         raise HTTPException(status_code=403, detail="Access denied")
 
+    # Check monthly usage limits
+    from db.supabase_client import get_or_create_usage
+    usage = get_or_create_usage(user_id)
+    if float(usage.get("transcription_seconds_used", 0) or 0) >= 1800:
+        raise HTTPException(
+            status_code=400,
+            detail="Monthly transcription limit (30 minutes) reached. Upgrade your plan to continue."
+        )
+
     # Create job record
     job = create_job(project_id, "transcribe")
 

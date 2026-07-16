@@ -4,10 +4,17 @@
 
 // ── Core Types ──────────────────────────────────────────────────────────────
 
+export interface WordTimestamp {
+  word: string;
+  start: number;
+  end: number;
+}
+
 export interface Segment {
   start: number;
   end: number;
   text: string;
+  words?: WordTimestamp[]; // populated when karaoke/word-level timestamps are requested
 }
 
 export interface Project {
@@ -47,7 +54,7 @@ export interface SubtitleStyle {
   created_at: string;
 }
 
-export type AnimationType = "fade" | "slide" | "pop" | "typewriter" | "none";
+export type AnimationType = "fade" | "slide" | "pop" | "typewriter" | "none" | "karaoke";
 
 export interface ExportRecord {
   id: string;
@@ -88,6 +95,9 @@ export interface ProjectListResponse {
 
 export interface TranscribeRequest {
   source_language?: string;
+  trim_start?: number; // seconds from start
+  trim_end?: number;   // seconds from start
+  word_timestamps?: boolean; // enable karaoke word-level highlights
 }
 
 export interface TranslateRequest {
@@ -158,43 +168,35 @@ export interface StylePreset {
 
 export const STYLE_PRESETS: StylePreset[] = [
   {
-    name: "Classic White",
-    description: "Clean white subtitles at the bottom",
-    font: "Arial",
-    color: "#FFFFFF",
-    position: "bottom",
-    animation_type: "fade",
-  },
-  {
-    name: "Neon Glow",
-    description: "Vibrant cyan with glow effect",
-    font: "Courier New",
-    color: "#00FFFF",
-    position: "bottom",
-    animation_type: "pop",
-  },
-  {
-    name: "Gradient Pop",
-    description: "Warm golden subtitles with pop animation",
-    font: "Georgia",
-    color: "#FFD700",
-    position: "bottom",
-    animation_type: "pop",
-  },
-  {
-    name: "Cinematic",
-    description: "Elegant serif font, centered positioning",
-    font: "Times New Roman",
-    color: "#F0E6D2",
-    position: "center",
-    animation_type: "fade",
-  },
-  {
     name: "Minimal",
-    description: "Simple light gray, no animation",
+    description: "Small, clean, bottom-centered, no animation",
     font: "Helvetica",
     color: "#CCCCCC",
     position: "bottom",
     animation_type: "none",
+  },
+  {
+    name: "Bold Pop",
+    description: "Large, high-contrast, warm orange color, slight pop animation",
+    font: "Impact",
+    color: "#F97316",
+    position: "bottom",
+    animation_type: "pop",
+  },
+  {
+    name: "Karaoke",
+    description: "Word-by-word highlight as it's spoken in real time",
+    font: "Inter",
+    color: "#10B981",
+    position: "bottom",
+    animation_type: "karaoke",
+  },
+  {
+    name: "Classic",
+    description: "Traditional white text with black outline",
+    font: "Arial",
+    color: "#FFFFFF",
+    position: "bottom",
+    animation_type: "fade",
   },
 ];

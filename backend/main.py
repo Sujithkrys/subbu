@@ -19,9 +19,9 @@ load_dotenv()
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     """Application startup/shutdown lifecycle."""
-    print("🚀 Subtitle Platform API starting up...")
+    print("Subtitle Platform API starting up...")
     yield
-    print("👋 Subtitle Platform API shutting down...")
+    print("Subtitle Platform API shutting down...")
 
 
 app = FastAPI(
