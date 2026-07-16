@@ -50,6 +50,15 @@ async def start_translation(
     if project["user_id"] != user_id:
         raise HTTPException(status_code=403, detail="Access denied")
 
+    # Check monthly usage limits
+    from db.supabase_client import get_or_create_usage
+    usage = get_or_create_usage(user_id)
+    if int(usage.get("translation_characters_used", 0) or 0) >= 50000:
+        raise HTTPException(
+            status_code=400,
+            detail="Monthly translation character limit (50,000 characters) reached. Upgrade your plan to continue."
+        )
+
     # Find the source transcript
     transcripts = get_transcripts(project_id)
     if not transcripts:

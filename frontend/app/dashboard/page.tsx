@@ -76,14 +76,23 @@ export default function DashboardPage() {
             {projects.length} project{projects.length !== 1 ? "s" : ""}
           </p>
         </div>
-        <button
-          className="btn-primary"
-          onClick={() => setShowModal(true)}
-          style={{ display: "flex", alignItems: "center", gap: "8px" }}
-        >
-          <span style={{ fontSize: "1.2rem" }}>+</span>
-          New Project
-        </button>
+        <div style={{ display: "flex", gap: "12px", alignItems: "center" }}>
+          <button
+            className="btn-secondary"
+            onClick={() => router.push("/settings")}
+            style={{ display: "flex", alignItems: "center", gap: "6px" }}
+          >
+            ⚙️ Settings
+          </button>
+          <button
+            className="btn-primary"
+            onClick={() => setShowModal(true)}
+            style={{ display: "flex", alignItems: "center", gap: "8px" }}
+          >
+            <span style={{ fontSize: "1.2rem" }}>+</span>
+            New Project
+          </button>
+        </div>
       </div>
 
       {/* Create Modal */}

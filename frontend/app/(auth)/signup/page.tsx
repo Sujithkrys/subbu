@@ -46,6 +46,20 @@ export default function SignupPage() {
     setLoading(false);
   };
 
+  const handleSkip = async () => {
+    setError("");
+    setLoading(true);
+    const { error } = await supabase.auth.signInAnonymously();
+
+    if (error) {
+      setError("Anonymous sign-in failed. Please register or enter password.");
+      setLoading(false);
+      return;
+    }
+
+    router.push("/dashboard");
+  };
+
   if (success) {
     return (
       <div
@@ -121,8 +135,37 @@ export default function SignupPage() {
           width: "100%",
           maxWidth: "420px",
           padding: "40px",
+          position: "relative",
         }}
       >
+        <button
+          onClick={handleSkip}
+          disabled={loading}
+          style={{
+            position: "absolute",
+            top: "16px",
+            right: "16px",
+            background: "rgba(255, 255, 255, 0.05)",
+            border: "1px solid rgba(255, 255, 255, 0.1)",
+            borderRadius: "8px",
+            padding: "6px 12px",
+            fontSize: "0.8rem",
+            fontWeight: 500,
+            color: "var(--color-text-secondary)",
+            cursor: "pointer",
+            transition: "all 0.2s ease",
+          }}
+          onMouseEnter={(e) => {
+            e.currentTarget.style.background = "rgba(255, 255, 255, 0.1)";
+            e.currentTarget.style.color = "var(--color-text-primary)";
+          }}
+          onMouseLeave={(e) => {
+            e.currentTarget.style.background = "rgba(255, 255, 255, 0.05)";
+            e.currentTarget.style.color = "var(--color-text-secondary)";
+          }}
+        >
+          Skip ➔
+        </button>
         <div style={{ textAlign: "center", marginBottom: "32px" }}>
           <div
             style={{

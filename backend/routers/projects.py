@@ -9,6 +9,7 @@ from fastapi import APIRouter, Header, HTTPException
 
 from db.supabase_client import (
     create_project, get_project, list_projects, get_transcripts, get_exports, get_style,
+    get_transcript, update_transcript, get_or_create_usage,
 )
 from models.schemas import (
     CreateProjectRequest, CreateProjectResponse,
@@ -132,4 +133,52 @@ async def get_project_details(
         "transcripts": transcripts,
         "exports": exports,
         "style": style,
+    }
+
+
+@router.put("/{project_id}/transcripts/{transcript_id}")
+async def update_project_transcript(
+    project_id: str,
+    transcript_id: str,
+    request: dict,
+    authorization: str = Header(...),
+):
+    """
+    Update a transcript's segments.
+    """
+    user_id = _extract_user_id_from_token(authorization)
+    project = get_project(project_id)
+    if not project:
+        raise HTTPException(status_code=404, detail="Project not found")
+    if project["user_id"] != user_id:
+        raise HTTPException(status_code=403, detail="Access denied")
+
+    transcript = get_transcript(transcript_id)
+    if not transcript or transcript["project_id"] != project_id:
+        raise HTTPException(status_code=404, detail="Transcript not found in this project")
+
+    segments = request.get("segments")
+    if segments is None:
+        raise HTTPException(status_code=400, detail="segments parameter is required")
+
+    updated = update_transcript(transcript_id, segments)
+    return updated
+
+
+@router.get("/user/usage")
+async def get_user_usage(authorization: str = Header(...)):
+    """Fetch the authenticated user's monthly usage details and limits."""
+    user_id = _extract_user_id_from_token(authorization)
+    usage = get_or_create_usage(user_id)
+
+    # Monthly limits constants
+    TRANSCRIPTION_LIMIT_SECONDS = 1800  # 30 minutes
+    TRANSLATION_LIMIT_CHARACTERS = 50000  # 50k chars
+
+    return {
+        "usage": usage,
+        "limits": {
+            "transcription_seconds": TRANSCRIPTION_LIMIT_SECONDS,
+            "translation_characters": TRANSLATION_LIMIT_CHARACTERS
+        }
     }

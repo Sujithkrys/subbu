@@ -64,6 +64,44 @@ def get_video_duration(video_path: str) -> float:
     return float(result.stdout.strip())
 
 
+def trim_video(
+    video_path: str,
+    output_path: str,
+    start_time: float = 0.0,
+    end_time: Optional[float] = None,
+) -> str:
+    """
+    Trim a video to a specified time range using FFmpeg.
+
+    Args:
+        video_path: Path to the input video.
+        output_path: Path for the trimmed output video.
+        start_time: Start time in seconds (default 0).
+        end_time: End time in seconds (None = until end of video).
+
+    Returns:
+        Path to the trimmed video.
+    """
+    cmd = ["ffmpeg", "-y", "-i", video_path, "-ss", str(start_time)]
+
+    if end_time is not None:
+        duration = end_time - start_time
+        cmd += ["-t", str(duration)]
+
+    cmd += [
+        "-c:v", "libx264",
+        "-c:a", "aac",
+        "-avoid_negative_ts", "1",
+        output_path,
+    ]
+
+    result = subprocess.run(cmd, capture_output=True, text=True, timeout=600)
+    if result.returncode != 0:
+        raise RuntimeError(f"FFmpeg trim failed: {result.stderr}")
+
+    return output_path
+
+
 def burn_subtitles(
     video_path: str,
     subtitle_path: str,

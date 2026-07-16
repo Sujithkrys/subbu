@@ -143,6 +143,17 @@ export async function listExports(
   return apiFetch(`/projects/${projectId}/exports`);
 }
 
+export async function updateTranscriptSegments(
+  projectId: string,
+  transcriptId: string,
+  segments: import("./types").Segment[]
+): Promise<import("./types").Transcript> {
+  return apiFetch<import("./types").Transcript>(`/projects/${projectId}/transcripts/${transcriptId}`, {
+    method: "PUT",
+    body: JSON.stringify({ segments }),
+  });
+}
+
 // ── Upload Helper ───────────────────────────────────────────────────────────
 
 export async function uploadVideoToR2(
@@ -172,4 +183,22 @@ export async function uploadVideoToR2(
     xhr.addEventListener("error", () => reject(new Error("Upload failed")));
     xhr.send(file);
   });
+}
+
+/** Fetch the current user's monthly usage & limits */
+export async function getUserUsage(): Promise<{
+  usage: {
+    transcription_seconds_used: number;
+    translation_characters_used: number;
+    month: string;
+  };
+  limits: {
+    transcription_seconds: number;
+    translation_characters: number;
+  };
+}> {
+  const headers = await getAuthHeaders();
+  const res = await fetch(`${API_URL}/projects/user/usage`, { headers });
+  if (!res.ok) throw new Error("Failed to fetch usage");
+  return res.json();
 }
