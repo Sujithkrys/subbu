@@ -8,3 +8,4 @@ groq
 pydantic>=2.0
 python-multipart
 qstash
+google-generativeai

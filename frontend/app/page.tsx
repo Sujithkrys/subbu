@@ -151,7 +151,7 @@ export default function HomePage() {
             {
               icon: "🌐",
               title: "Translate",
-              desc: "Powered by Bhashini API — translate into Telugu, Hindi, Tamil, and more.",
+              desc: "Powered by Gemini API — translate into Telugu, Hindi, Tamil, and more.",
             },
             {
               icon: "🎨",

@@ -1,6 +1,6 @@
 # 🎬 AI Subtitle Generator Platform
 
-AI-powered subtitle generation and translation platform for Indian languages. Upload a video, get instant transcription via Groq Whisper, translate into Telugu, Hindi, Tamil, and more via Bhashini API, customize subtitle styles, and export in multiple formats.
+AI-powered subtitle generation and translation platform for Indian languages. Upload a video, get instant transcription via Groq Whisper, translate into Telugu, Hindi, Tamil, and more via Google Gemini API, customize subtitle styles, and export in multiple formats.
 
 ## Architecture
 
@@ -9,7 +9,7 @@ AI-powered subtitle generation and translation platform for Indian languages. Up
 │   Frontend          │    │   Backend            │    │   Services   │
 │   (Next.js)         │───▶│   (FastAPI)          │───▶│              │
 │   Cloudflare Pages  │    │   Render             │    │  Groq Whisper│
-└─────────────────────┘    └─────────────────────┘    │  Bhashini NMT│
+└─────────────────────┘    └─────────────────────┘    │  Gemini NMT    │
          │                          │                  │  FFmpeg      │
          │                          │                  └──────────────┘
          ▼                          ▼
@@ -35,7 +35,7 @@ AI-powered subtitle generation and translation platform for Indian languages. Up
 | Object Storage | Cloudflare R2 |
 | Job Queue | Upstash Redis + QStash |
 | Speech-to-Text | Groq API (Whisper Large v3) |
-| Translation | Bhashini API (Gov. of India) |
+| Translation | Google Gemini API (gemini-3-flash) |
 | Video Processing | FFmpeg |
 
 ## Getting Started
@@ -45,7 +45,7 @@ AI-powered subtitle generation and translation platform for Indian languages. Up
 - Node.js 18+
 - Python 3.12+
 - FFmpeg installed locally
-- Accounts on: Supabase, Cloudflare, Groq, Bhashini, Upstash
+- Accounts on: Supabase, Cloudflare, Groq, Gemini (Google AI), Upstash
 
 ### Setup
 

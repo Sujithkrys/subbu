@@ -4,7 +4,7 @@ Called by QStash to process translation jobs.
 
 Pipeline:
 1. Fetch source transcript from Supabase
-2. Translate each segment via Bhashini API
+2. Translate each segment via Gemini API
 3. Save translated transcript
 4. Update job status
 """
