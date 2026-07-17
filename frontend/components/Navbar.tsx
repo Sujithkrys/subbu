@@ -88,17 +88,20 @@ export default function Navbar() {
       <div style={{ display: "flex", alignItems: "center", gap: "16px" }}>
         {user ? (
           <>
-            <button
-              onClick={() => router.push("/dashboard")}
-              className="btn-secondary"
-              style={{
-                padding: "8px 16px",
-                fontSize: "0.85rem",
-                background: pathname === "/dashboard" ? "var(--color-bg-hover)" : undefined,
-              }}
-            >
-              Dashboard
-            </button>
+            {pathname !== "/dashboard" && (
+              <button
+                onClick={() => router.push("/dashboard")}
+                className="btn-secondary"
+                style={{
+                  padding: "8px 16px",
+                  fontSize: "0.85rem",
+                  border: "none",
+                  background: "transparent",
+                }}
+              >
+                Dashboard
+              </button>
+            )}
             <div style={{ position: "relative" }}>
               <button
                 onClick={() => setMenuOpen(!menuOpen)}
@@ -137,28 +140,69 @@ export default function Navbar() {
                     color: "var(--color-text-secondary)",
                     fontSize: "0.8rem",
                     borderBottom: "1px solid var(--color-border)",
-                    marginBottom: "4px",
+                    marginBottom: "8px",
                   }}>
-                    {user.email}
+                    {user.email || "Guest User"}
                   </div>
+                  
                   <button
-                    onClick={handleSignOut}
+                    onClick={() => {
+                      setMenuOpen(false);
+                      router.push("/settings");
+                    }}
                     style={{
                       width: "100%",
                       padding: "8px 12px",
                       background: "none",
                       border: "none",
-                      color: "#ef4444",
+                      color: "var(--color-text-primary)",
                       cursor: "pointer",
                       textAlign: "left",
                       borderRadius: "var(--radius-sm)",
                       fontSize: "0.9rem",
+                      display: "flex",
+                      alignItems: "center",
+                      gap: "8px",
                       transition: "background 0.2s",
                     }}
-                    onMouseEnter={(e) => (e.currentTarget.style.background = "rgba(239,68,68,0.1)")}
+                    onMouseEnter={(e) => (e.currentTarget.style.background = "var(--color-bg-hover)")}
                     onMouseLeave={(e) => (e.currentTarget.style.background = "none")}
                   >
-                    Sign Out
+                    <span>⚙️</span> Settings
+                  </button>
+
+                  <div style={{ height: "1px", background: "var(--color-border)", margin: "4px 0" }} />
+
+                  <button
+                    onClick={() => {
+                      if (user.is_anonymous) {
+                        setMenuOpen(false);
+                        router.push("/signup");
+                      } else {
+                        handleSignOut();
+                      }
+                    }}
+                    style={{
+                      width: "100%",
+                      padding: "8px 12px",
+                      background: "none",
+                      border: "none",
+                      color: user.is_anonymous ? "var(--color-primary)" : "#ef4444",
+                      cursor: "pointer",
+                      textAlign: "left",
+                      borderRadius: "var(--radius-sm)",
+                      fontSize: "0.9rem",
+                      fontWeight: user.is_anonymous ? 600 : 400,
+                      transition: "background 0.2s",
+                    }}
+                    onMouseEnter={(e) => {
+                      e.currentTarget.style.background = user.is_anonymous 
+                        ? "rgba(124, 58, 237, 0.1)" // assuming purple/primary color
+                        : "rgba(239, 68, 68, 0.1)";
+                    }}
+                    onMouseLeave={(e) => (e.currentTarget.style.background = "none")}
+                  >
+                    {user.is_anonymous ? "Sign Up / Log In" : "Sign Out"}
                   </button>
                 </div>
               )}

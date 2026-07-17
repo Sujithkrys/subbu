@@ -26,6 +26,11 @@ export interface Project {
   duration_seconds: number | null;
   status: ProjectStatus;
   created_at: string;
+  is_favorite?: boolean;
+  file_size_bytes?: number;
+  transcripts?: Transcript[];
+  exports?: ExportRecord[];
+  subtitle_styles?: SubtitleStyle[];
 }
 
 export type ProjectStatus =
@@ -91,6 +96,27 @@ export interface CreateProjectResponse {
 
 export interface ProjectListResponse {
   projects: Project[];
+}
+
+export interface ActivityLogEntry {
+  id: string;
+  user_id: string;
+  project_id?: string;
+  action: string;
+  details?: any;
+  created_at: string;
+  projects?: { title: string }; // joined from projects table
+}
+
+export interface DashboardMetricsResponse {
+  metrics: {
+    total_videos: number;
+    total_minutes: number;
+    storage_bytes: number;
+    distinct_languages: number;
+  };
+  top_languages: { language: string; count: number }[];
+  recent_activity: ActivityLogEntry[];
 }
 
 export interface TranscribeRequest {

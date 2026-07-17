@@ -49,11 +49,11 @@ def get_project(project_id: str) -> dict:
 
 
 def list_projects(user_id: str) -> list[dict]:
-    """List all projects for a user."""
+    """List all projects for a user, including related data for dashboard filters."""
     sb = get_supabase()
     result = (
         sb.table("projects")
-        .select("*")
+        .select("*, transcripts(*), subtitle_styles(*), exports(*)")
         .eq("user_id", user_id)
         .order("created_at", desc=True)
         .execute()
@@ -276,3 +276,66 @@ def increment_usage(user_id: str, transcription_seconds: float = 0, translation_
         .execute()
     )
     return result.data[0]
+
+
+# ── Dashboard helpers ────────────────────────────────────────────────────────
+
+def log_activity(user_id: str, action: str, project_id: str = None, details: dict = None) -> dict:
+    """Log an activity for the user's dashboard."""
+    sb = get_supabase()
+    payload = {
+        "user_id": user_id,
+        "action": action
+    }
+    if project_id:
+        payload["project_id"] = project_id
+    if details:
+        payload["details"] = details
+        
+    result = sb.table("activity_log").insert(payload).execute()
+    return result.data[0]
+
+
+def get_recent_activity(user_id: str, limit: int = 50) -> list[dict]:
+    """Get recent activity for a user."""
+    sb = get_supabase()
+    result = (
+        sb.table("activity_log")
+        .select("*, projects(title)")
+        .eq("user_id", user_id)
+        .order("created_at", desc=True)
+        .limit(limit)
+        .execute()
+    )
+    return result.data
+
+
+def toggle_favorite(project_id: str, is_favorite: bool) -> dict:
+    """Toggle the favorite status of a project."""
+    sb = get_supabase()
+    result = (
+        sb.table("projects")
+        .update({"is_favorite": is_favorite})
+        .eq("id", project_id)
+        .execute()
+    )
+    return result.data[0]
+
+
+def update_project_file_size(project_id: str, file_size_bytes: int) -> dict:
+    """Update a project's storage file size."""
+    sb = get_supabase()
+    result = (
+        sb.table("projects")
+        .update({"file_size_bytes": file_size_bytes})
+        .eq("id", project_id)
+        .execute()
+    )
+    return result.data[0]
+
+
+def delete_project(project_id: str) -> bool:
+    """Delete a project (cascades to related records)."""
+    sb = get_supabase()
+    sb.table("projects").delete().eq("id", project_id).execute()
+    return True

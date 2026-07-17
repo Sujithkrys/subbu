@@ -15,6 +15,7 @@ import type {
   StyleRequest,
   ExportRequest,
   SubtitleStyle,
+  DashboardMetricsResponse,
 } from "./types";
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
@@ -139,8 +140,33 @@ export async function startExport(
 
 export async function listExports(
   projectId: string
-): Promise<{ exports: import("./types").ExportRecord[] }> {
+): Promise<any> {
   return apiFetch(`/projects/${projectId}/exports`);
+}
+
+// ── Dashboard APIs ──────────────────────────────────────────────────────────
+
+export async function getDashboardMetrics(): Promise<DashboardMetricsResponse> {
+  return apiFetch<DashboardMetricsResponse>("/projects/dashboard/metrics");
+}
+
+export async function toggleFavorite(projectId: string, isFavorite: boolean): Promise<any> {
+  return apiFetch(`/projects/${projectId}/favorite`, {
+    method: "POST",
+    body: JSON.stringify({ is_favorite: isFavorite }),
+  });
+}
+
+export async function duplicateProject(projectId: string): Promise<CreateProjectResponse> {
+  return apiFetch<CreateProjectResponse>(`/projects/${projectId}/duplicate`, {
+    method: "POST",
+  });
+}
+
+export async function deleteProject(projectId: string): Promise<any> {
+  return apiFetch(`/projects/${projectId}`, {
+    method: "DELETE",
+  });
 }
 
 export async function updateTranscriptSegments(

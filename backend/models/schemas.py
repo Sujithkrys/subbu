@@ -42,7 +42,7 @@ class ProjectResponse(BaseModel):
 
 
 class ProjectListResponse(BaseModel):
-    projects: list[ProjectResponse]
+    projects: list[dict]
 
 
 # ── Transcription ────────────────────────────────────────────────────────────
