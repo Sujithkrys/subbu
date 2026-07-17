@@ -284,7 +284,7 @@ function LanguageShowcase() {
           <p style={{ color: "var(--color-text-secondary)" }}>Native Indic font stacks guarantee rendering accuracy with no broken characters</p>
         </div>
 
-        <div style={{ display: "grid", gridTemplateColumns: "1fr", md: "250px 1fr", gap: "32px" }}>
+        <div className="grid grid-cols-1 md:grid-cols-[250px_1fr] gap-8">
           {/* Toggles */}
           <div
             style={{

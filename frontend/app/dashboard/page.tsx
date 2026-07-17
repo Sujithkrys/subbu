@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, useMemo } from "react";
+import { useEffect, useState, useMemo, Suspense } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { listProjects, getDashboardMetrics, toggleFavorite, deleteProject, duplicateProject } from "@/lib/api";
 import type { Project, DashboardMetricsResponse } from "@/lib/types";
@@ -11,7 +11,7 @@ import ActivityFeed from "@/components/dashboard/ActivityFeed";
 import JSZip from "jszip";
 import { saveAs } from "file-saver";
 
-export default function DashboardPage() {
+function DashboardContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
 
@@ -226,7 +226,7 @@ export default function DashboardPage() {
         />
       </div>
 
-      <div style={{ display: "flex", gap: "24px", flexDirection: "column", lg: { flexDirection: "row" } }}>
+      <div className="flex flex-col lg:flex-row gap-6">
         <div style={{ flex: 1 }}>
           <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "24px" }}>
             <h1 style={{ fontSize: "1.8rem", fontWeight: 700 }}>My Projects</h1>
@@ -404,5 +404,13 @@ function MetricCard({ label, value, loading }: { label: string; value: any; load
         <span style={{ fontSize: "2rem", fontWeight: 700 }}>{value !== undefined && value !== null ? value : "—"}</span>
       )}
     </div>
+  );
+}
+
+export default function DashboardPage() {
+  return (
+    <Suspense fallback={<div className="p-8 text-center">Loading dashboard...</div>}>
+      <DashboardContent />
+    </Suspense>
   );
 }
