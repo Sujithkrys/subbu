@@ -19,6 +19,7 @@ from fastapi import APIRouter, Request
 from db.supabase_client import (
     get_project, update_job, update_project_status,
     save_transcript, update_project_duration, increment_usage,
+    update_project_file_size, log_activity
 )
 from services.storage_service import download_file
 from services.ffmpeg_service import extract_audio, get_video_duration, trim_video
@@ -57,6 +58,11 @@ async def process_transcription(request: Request):
             # Step 1: Download video from R2
             video_path = os.path.join(tmp_dir, "video.mp4")
             download_file(video_key, video_path)
+            
+            # Record file size
+            file_size = os.path.getsize(video_path)
+            update_project_file_size(project_id, file_size)
+            
             update_job(job_id, "processing", progress=20)
 
             # Step 1b: Trim video if trim params provided
@@ -99,9 +105,10 @@ async def process_transcription(request: Request):
         update_job(job_id, "done", progress=100)
         update_project_status(project_id, "ready")
 
-        # Step 7.5: Increment usage limits
+        # Step 7.5: Increment usage limits and log activity
         try:
             increment_usage(project["user_id"], transcription_seconds=duration)
+            log_activity(project["user_id"], "transcription_completed", project_id, details={"language": final_lang})
         except Exception as e:
             print(f"Warning: Failed to increment usage: {e}")
 

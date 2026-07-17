@@ -10,6 +10,7 @@ from fastapi import APIRouter, Header, HTTPException
 from db.supabase_client import (
     create_project, get_project, list_projects, get_transcripts, get_exports, get_style,
     get_transcript, update_transcript, get_or_create_usage,
+    log_activity, get_recent_activity, toggle_favorite, update_project_file_size, delete_project, save_style
 )
 from models.schemas import (
     CreateProjectRequest, CreateProjectResponse,
@@ -182,3 +183,120 @@ async def get_user_usage(authorization: str = Header(...)):
             "translation_characters": TRANSLATION_LIMIT_CHARACTERS
         }
     }
+
+
+@router.get("/dashboard/metrics")
+async def get_dashboard_metrics(authorization: str = Header(...)):
+    """Fetch aggregate metrics and recent activity for the dashboard."""
+    user_id = _extract_user_id_from_token(authorization)
+    
+    # We can compute metrics on the fly by fetching all projects or we can do it via a DB view.
+    # For now, fetch all projects to compute.
+    projects = list_projects(user_id)
+    
+    total_videos = len(projects)
+    total_minutes = sum([p.get("duration_seconds", 0) or 0 for p in projects]) / 60.0
+    storage_bytes = sum([p.get("file_size_bytes", 0) or 0 for p in projects])
+    
+    # Extract distinct languages and top languages
+    languages = []
+    for p in projects:
+        for t in p.get("transcripts", []):
+            languages.append(t.get("language"))
+            
+    from collections import Counter
+    lang_counts = Counter(languages)
+    distinct_languages = len(lang_counts)
+    
+    top_languages = [{"language": lang, "count": count} for lang, count in lang_counts.most_common(5)]
+    
+    recent_activity = get_recent_activity(user_id, limit=10)
+    
+    return {
+        "metrics": {
+            "total_videos": total_videos,
+            "total_minutes": total_minutes,
+            "storage_bytes": storage_bytes,
+            "distinct_languages": distinct_languages
+        },
+        "top_languages": top_languages,
+        "recent_activity": recent_activity
+    }
+
+
+@router.post("/{project_id}/favorite")
+async def favorite_project(
+    project_id: str,
+    request: dict,
+    authorization: str = Header(...),
+):
+    """Toggle the favorite status of a project."""
+    user_id = _extract_user_id_from_token(authorization)
+    project = get_project(project_id)
+    if not project or project["user_id"] != user_id:
+        raise HTTPException(status_code=404, detail="Project not found")
+        
+    is_favorite = request.get("is_favorite", False)
+    toggle_favorite(project_id, is_favorite)
+    log_activity(user_id, "project_favorited" if is_favorite else "project_unfavorited", project_id)
+    return {"success": True, "is_favorite": is_favorite}
+
+
+@router.delete("/{project_id}")
+async def delete_project_endpoint(
+    project_id: str,
+    authorization: str = Header(...),
+):
+    """Delete a project and all associated data."""
+    user_id = _extract_user_id_from_token(authorization)
+    project = get_project(project_id)
+    if not project or project["user_id"] != user_id:
+        raise HTTPException(status_code=404, detail="Project not found")
+        
+    delete_project(project_id)
+    log_activity(user_id, "project_deleted", details={"title": project.get("title")})
+    return {"success": True}
+
+
+@router.post("/{project_id}/duplicate")
+async def duplicate_project(
+    project_id: str,
+    authorization: str = Header(...),
+):
+    """Clone a project's settings into a new blank project."""
+    user_id = _extract_user_id_from_token(authorization)
+    project = get_project(project_id)
+    if not project or project["user_id"] != user_id:
+        raise HTTPException(status_code=404, detail="Project not found")
+        
+    new_title = f"{project.get('title', 'Untitled')} (Copy)"
+    video_key = f"videos/{user_id}/{uuid.uuid4()}.mp4"
+    
+    new_project = create_project(user_id, new_title, video_key)
+    
+    # Copy style if exists
+    style = get_style(project_id)
+    if style:
+        save_style(
+            project_id=new_project["id"],
+            font=style.get("font"),
+            color=style.get("color"),
+            position=style.get("position"),
+            animation_type=style.get("animation_type")
+        )
+        
+    # Generate presigned URL for the new project
+    upload_url = generate_upload_url(
+        key=video_key,
+        content_type="video/mp4",
+        expires_in=3600,
+    )
+    
+    log_activity(user_id, "project_duplicated", new_project["id"])
+    
+    return CreateProjectResponse(
+        id=new_project["id"],
+        title=new_project["title"],
+        upload_url=upload_url,
+        video_key=video_key,
+    )
