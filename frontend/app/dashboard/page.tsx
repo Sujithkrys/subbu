@@ -23,13 +23,14 @@ function DashboardContent() {
   const [showModal, setShowModal] = useState(false);
   const [newTitle, setNewTitle] = useState("");
   const [creating, setCreating] = useState(false);
+  const [viewModeState, setViewModeState] = useState<"grid" | "table">("grid");
 
   // URL State via searchParams
   const searchQuery = searchParams.get("q") || "";
   const statusFilter = searchParams.get("status") || "all";
   const langFilter = searchParams.get("lang") || "all";
   const favoritesOnly = searchParams.get("fav") === "true";
-  const viewMode = (searchParams.get("view") as "grid" | "table") || "grid";
+  const viewMode = viewModeState;
   const sortField = searchParams.get("sort") || "created_at";
   const sortOrder = (searchParams.get("order") as "asc" | "desc") || "desc";
 
@@ -234,7 +235,7 @@ function DashboardContent() {
               {/* View Toggle moved from filters */}
               <div style={{ display: "flex", background: "var(--color-bg-elevated)", borderRadius: "var(--radius-sm)", padding: "4px" }}>
                 <button
-                  onClick={() => updateParam("view", "grid")}
+                  onClick={() => setViewModeState("grid")}
                   style={{
                     padding: "6px 12px",
                     background: viewMode === "grid" ? "var(--color-border)" : "transparent",
@@ -248,7 +249,7 @@ function DashboardContent() {
                   Grid
                 </button>
                 <button
-                  onClick={() => updateParam("view", "table")}
+                  onClick={() => setViewModeState("table")}
                   style={{
                     padding: "6px 12px",
                     background: viewMode === "table" ? "var(--color-border)" : "transparent",
