@@ -25,24 +25,17 @@ function DashboardContent() {
   const [creating, setCreating] = useState(false);
   const [viewModeState, setViewModeState] = useState<"grid" | "table">("grid");
 
-  // URL State via searchParams
-  const searchQuery = searchParams.get("q") || "";
-  const statusFilter = searchParams.get("status") || "all";
-  const langFilter = searchParams.get("lang") || "all";
-  const favoritesOnly = searchParams.get("fav") === "true";
-  const viewMode = viewModeState;
-  const sortField = searchParams.get("sort") || "created_at";
-  const sortOrder = (searchParams.get("order") as "asc" | "desc") || "desc";
+  // Local State instead of URL searchParams (fixes static export routing bugs)
+  const [searchQuery, setSearchQuery] = useState("");
+  const [statusFilter, setStatusFilter] = useState("all");
+  const [langFilter, setLangFilter] = useState("all");
+  const [favoritesOnly, setFavoritesOnly] = useState(false);
+  const [sortField, setSortField] = useState("created_at");
+  const [sortOrder, setSortOrder] = useState<"asc" | "desc">("desc");
 
-  const updateParam = (key: string, value: string | null) => {
-    const params = new URLSearchParams(searchParams.toString());
-    if (value === null || value === "all" || value === "") {
-      params.delete(key);
-    } else {
-      params.set(key, value);
-    }
-    router.replace(`/dashboard?${params.toString()}`);
-  };
+  const viewMode = viewModeState;
+
+  // Removed updateParam since we use local state now
 
   useEffect(() => {
     loadData();
@@ -271,17 +264,17 @@ function DashboardContent() {
 
           <DashboardFilters
             searchQuery={searchQuery}
-            onSearchChange={(q) => updateParam("q", q)}
+            onSearchChange={(q) => setSearchQuery(q)}
             statusFilter={statusFilter}
-            onStatusChange={(s) => updateParam("status", s)}
+            onStatusChange={(s) => setStatusFilter(s)}
             langFilter={langFilter}
-            onLangChange={(l) => updateParam("lang", l)}
+            onLangChange={(l) => setLangFilter(l)}
             favoritesOnly={favoritesOnly}
-            onFavoritesToggle={() => updateParam("fav", favoritesOnly ? null : "true")}
+            onFavoritesToggle={() => setFavoritesOnly(!favoritesOnly)}
             sortField={sortField}
-            onSortChange={(f) => updateParam("sort", f)}
+            onSortChange={(f) => setSortField(f)}
             sortOrder={sortOrder}
-            onSortOrderChange={() => updateParam("order", sortOrder === "asc" ? "desc" : "asc")}
+            onSortOrderChange={() => setSortOrder(sortOrder === "asc" ? "desc" : "asc")}
           />
 
           {loading ? (
@@ -324,10 +317,10 @@ function DashboardContent() {
               sortOrder={sortOrder}
               onSort={(f) => {
                 if (sortField === f) {
-                  updateParam("order", sortOrder === "asc" ? "desc" : "asc");
+                  setSortOrder(sortOrder === "asc" ? "desc" : "asc");
                 } else {
-                  updateParam("sort", f);
-                  updateParam("order", "asc");
+                  setSortField(f);
+                  setSortOrder("asc");
                 }
               }}
               onNavigate={(id) => router.push(`/project/${id}`)}
