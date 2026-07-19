@@ -52,6 +52,14 @@ function EditorContent() {
 
   const loadProject = async () => {
     try {
+      const { createClient } = await import("@/lib/supabaseClient");
+      const sb = createClient();
+      const { data: { user } } = await sb.auth.getUser();
+      if (!user) {
+        router.push("/login");
+        return;
+      }
+
       const data = await getProject(projectId!);
       setProject(data);
       if (data.transcripts && data.transcripts.length > 0) {
