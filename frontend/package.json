@@ -3,15 +3,14 @@
   "version": "0.1.0",
   "private": true,
   "scripts": {
-    "dev": "tailwindcss -i ./app/globals.css -o ./app/generated.css && next dev",
-    "build": "tailwindcss -i ./app/globals.css -o ./app/generated.css && next build",
+    "dev": "next dev",
+    "build": "next build",
     "start": "next start",
     "lint": "eslint"
   },
   "dependencies": {
     "@supabase/ssr": "^0.12.3",
     "@supabase/supabase-js": "^2.110.7",
-    "@tailwindcss/cli": "^4.3.3",
     "@tailwindcss/postcss": "^4",
     "@types/file-saver": "^2.0.7",
     "file-saver": "^2.0.5",
