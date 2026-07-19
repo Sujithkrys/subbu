@@ -3,28 +3,114 @@
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabaseClient";
+import { getUserSettings, updateUserSettings } from "@/lib/api";
 
 export default function SettingsPage() {
   const supabase = createClient();
   const router = useRouter();
   const [user, setUser] = useState<any>(null);
+  const [theme, setTheme] = useState<"dark" | "light">("dark");
+  const [isSavingTheme, setIsSavingTheme] = useState(false);
 
   useEffect(() => {
     supabase.auth.getUser().then(({ data }) => {
       setUser(data.user);
     });
+    
+    // Load current theme
+    getUserSettings().then(res => {
+      if (res?.theme) setTheme(res.theme as "dark" | "light");
+    }).catch(err => {
+      // fallback to DOM
+      const current = document.documentElement.getAttribute("data-theme");
+      if (current) setTheme(current as "dark" | "light");
+    });
   }, []);
 
   const isAnonymous = user && !user.email;
 
+  const handleThemeChange = async (newTheme: "dark" | "light") => {
+    setTheme(newTheme);
+    document.documentElement.setAttribute("data-theme", newTheme);
+    setIsSavingTheme(true);
+    try {
+      await updateUserSettings(newTheme);
+    } catch (err) {
+      console.error("Failed to save theme", err);
+    } finally {
+      setIsSavingTheme(false);
+    }
+  };
+
   return (
-    <div style={{ display: "flex", flexDirection: "column", gap: "24px" }}>
+    <div style={{ display: "flex", flexDirection: "column", gap: "24px", maxWidth: "800px", margin: "0 auto", padding: "40px" }}>
+      <h1 style={{ fontSize: "2rem", fontWeight: 700, marginBottom: "16px" }}>Settings</h1>
+      
+      {/* Appearance Info Card */}
+      <div
+        style={{
+          background: "var(--color-card)",
+          border: "1px solid var(--color-border-theme)",
+          padding: "24px",
+          borderRadius: "12px",
+        }}
+      >
+        <h2 style={{ fontSize: "1.1rem", fontWeight: 600, marginBottom: "20px" }}>
+          Appearance
+        </h2>
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+          <div>
+            <div style={{ fontWeight: 500, fontSize: "1rem" }}>Theme</div>
+            <div style={{ color: "var(--color-text-secondary)", fontSize: "0.9rem" }}>Select your preferred interface theme.</div>
+          </div>
+          
+          <div style={{ display: "flex", background: "var(--color-track)", padding: "4px", borderRadius: "8px", gap: "4px" }}>
+            <button
+              onClick={() => handleThemeChange("dark")}
+              style={{
+                background: theme === "dark" ? "var(--color-pill)" : "transparent",
+                color: theme === "dark" ? "var(--color-pill-text)" : "var(--color-text-primary)",
+                padding: "8px 24px",
+                borderRadius: "6px",
+                fontWeight: 500,
+                fontSize: "0.9rem",
+                border: "none",
+                cursor: "pointer",
+                transition: "all 0.2s"
+              }}
+            >
+              Dark
+            </button>
+            <button
+              onClick={() => handleThemeChange("light")}
+              style={{
+                background: theme === "light" ? "var(--color-pill)" : "transparent",
+                color: theme === "light" ? "var(--color-pill-text)" : "var(--color-text-primary)",
+                padding: "8px 24px",
+                borderRadius: "6px",
+                fontWeight: 500,
+                fontSize: "0.9rem",
+                border: "none",
+                cursor: "pointer",
+                transition: "all 0.2s"
+              }}
+            >
+              Light
+            </button>
+          </div>
+        </div>
+      </div>
+
       {/* Account Info Card */}
       <div
-        className="card glass"
-        style={{ padding: "24px", borderRadius: "var(--radius-lg)" }}
+        style={{
+          background: "var(--color-card)",
+          border: "1px solid var(--color-border-theme)",
+          padding: "24px",
+          borderRadius: "12px",
+        }}
       >
-        <h2 style={{ fontSize: "1.1rem", fontWeight: 700, marginBottom: "20px" }}>
+        <h2 style={{ fontSize: "1.1rem", fontWeight: 600, marginBottom: "20px" }}>
           Account Information
         </h2>
         <div style={{ display: "flex", flexDirection: "column", gap: "14px" }}>
@@ -41,41 +127,32 @@ export default function SettingsPage() {
       {/* Guest upgrade prompt */}
       {isAnonymous && (
         <div
-          className="card"
           style={{
+            background: "var(--color-card)",
             padding: "24px",
-            borderRadius: "var(--radius-lg)",
-            border: "1px solid var(--color-primary)",
-            background: "rgba(99, 102, 241, 0.05)",
+            borderRadius: "12px",
+            border: "1px solid var(--color-accent)",
           }}
         >
-          <h3 style={{ fontWeight: 700, marginBottom: "8px" }}>
+          <h3 style={{ fontWeight: 600, marginBottom: "8px" }}>
             🔒 Save your work permanently
           </h3>
           <p style={{ color: "var(--color-text-secondary)", fontSize: "0.9rem", marginBottom: "16px" }}>
             You are currently using Subbu as a guest. Create a free account to save your projects and subtitles permanently.
           </p>
-          <button className="btn-primary" onClick={() => router.push("/signup")}>
+          <button style={{
+            background: "var(--color-accent)",
+            color: "#FFF",
+            padding: "10px 24px",
+            borderRadius: "8px",
+            border: "none",
+            fontWeight: 500,
+            cursor: "pointer"
+          }} onClick={() => router.push("/signup")}>
             Create Free Account
           </button>
         </div>
       )}
-
-      {/* Style Presets shortcut */}
-      <div
-        className="card glass"
-        style={{ padding: "24px", borderRadius: "var(--radius-lg)" }}
-      >
-        <h2 style={{ fontSize: "1.1rem", fontWeight: 700, marginBottom: "8px" }}>
-          Subtitle Style Presets
-        </h2>
-        <p style={{ color: "var(--color-text-secondary)", fontSize: "0.9rem", marginBottom: "16px" }}>
-          Customise the look and feel of your subtitles across all projects.
-        </p>
-        <button className="btn-secondary" onClick={() => router.push("/styles")}>
-          Open Style Gallery →
-        </button>
-      </div>
     </div>
   );
 }
@@ -87,8 +164,8 @@ function Row({ label, value }: { label: string; value: string }) {
         display: "flex",
         justifyContent: "space-between",
         alignItems: "center",
-        padding: "10px 0",
-        borderBottom: "1px solid var(--color-border)",
+        padding: "12px 0",
+        borderBottom: "1px solid var(--color-border-theme)",
       }}
     >
       <span style={{ color: "var(--color-text-secondary)", fontSize: "0.9rem" }}>{label}</span>

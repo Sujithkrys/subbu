@@ -10,11 +10,13 @@ from fastapi import APIRouter, Header, HTTPException
 from db.supabase_client import (
     create_project, get_project, list_projects, get_transcripts, get_exports, get_style,
     get_transcript, update_transcript, get_or_create_usage,
-    log_activity, get_recent_activity, toggle_favorite, update_project_file_size, delete_project, save_style
+    log_activity, get_recent_activity, toggle_favorite, update_project_file_size, delete_project, save_style,
+    get_user_settings, update_user_settings
 )
 from models.schemas import (
     CreateProjectRequest, CreateProjectResponse,
     ProjectResponse, ProjectListResponse,
+    UserSettingsRequest, UserSettingsResponse
 )
 from services.storage_service import generate_upload_url, generate_download_url
 
@@ -159,10 +161,12 @@ async def update_project_transcript(
         raise HTTPException(status_code=404, detail="Transcript not found in this project")
 
     segments = request.get("segments")
-    if segments is None:
-        raise HTTPException(status_code=400, detail="segments parameter is required")
+    review_state = request.get("review_state")
+    
+    if segments is None and review_state is None:
+        raise HTTPException(status_code=400, detail="segments or review_state parameter is required")
 
-    updated = update_transcript(transcript_id, segments)
+    updated = update_transcript(transcript_id, segments=segments, review_state=review_state)
     return updated
 
 
@@ -183,6 +187,25 @@ async def get_user_usage(authorization: str = Header(...)):
             "translation_characters": TRANSLATION_LIMIT_CHARACTERS
         }
     }
+
+
+@router.get("/user/settings", response_model=UserSettingsResponse)
+async def get_settings(authorization: str = Header(...)):
+    """Fetch the authenticated user's settings (theme)."""
+    user_id = _extract_user_id_from_token(authorization)
+    settings = get_user_settings(user_id)
+    return UserSettingsResponse(user_id=settings["user_id"], theme=settings.get("theme", "dark"))
+
+
+@router.patch("/user/settings", response_model=UserSettingsResponse)
+async def update_settings(
+    request: UserSettingsRequest,
+    authorization: str = Header(...),
+):
+    """Update the authenticated user's settings."""
+    user_id = _extract_user_id_from_token(authorization)
+    settings = update_user_settings(user_id, request.theme)
+    return UserSettingsResponse(user_id=settings["user_id"], theme=settings.get("theme", "dark"))
 
 
 @router.get("/dashboard/metrics")

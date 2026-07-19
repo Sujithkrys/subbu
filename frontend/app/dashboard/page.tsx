@@ -1,68 +1,59 @@
 "use client";
 
-import { useEffect, useState, useMemo, Suspense } from "react";
-import { useRouter, useSearchParams } from "next/navigation";
-import { listProjects, getDashboardMetrics, toggleFavorite, deleteProject, duplicateProject } from "@/lib/api";
-import type { Project, DashboardMetricsResponse } from "@/lib/types";
-import DashboardFilters from "@/components/dashboard/DashboardFilters";
-import ProjectCard from "@/components/dashboard/ProjectCard";
-import ProjectTable from "@/components/dashboard/ProjectTable";
-import ActivityFeed from "@/components/dashboard/ActivityFeed";
-import JSZip from "jszip";
-import { saveAs } from "file-saver";
+import { useState, useEffect, Suspense } from "react";
+import { useRouter } from "next/navigation";
+import { Play, RefreshCw, AlertTriangle, Upload, Search } from "lucide-react";
+import { listProjects, getDashboardMetrics, createProject } from "@/lib/api";
+import { createClient } from "@/lib/supabaseClient";
+
+const LANGS: Record<string, string> = { te: "Telugu", hi: "Hindi", en: "English", ta: "Tamil", ml: "Malayalam", kn: "Kannada", bn: "Bengali", mr: "Marathi", gu: "Gujarati" };
 
 function DashboardContent() {
   const router = useRouter();
-  const searchParams = useSearchParams();
-
-  // State
-  const [projects, setProjects] = useState<Project[]>([]);
-  const [metrics, setMetrics] = useState<DashboardMetricsResponse | null>(null);
+  const [q, setQ] = useState("");
+  const [projects, setProjects] = useState<any[]>([]);
+  const [metrics, setMetrics] = useState<any>(null);
+  const [userName, setUserName] = useState("Creator");
   const [loading, setLoading] = useState(true);
-  const [selectedIds, setSelectedIds] = useState<string[]>([]);
+
+  // Upload modal state
   const [showModal, setShowModal] = useState(false);
   const [newTitle, setNewTitle] = useState("");
   const [creating, setCreating] = useState(false);
-  const [viewModeState, setViewModeState] = useState<"grid" | "table">("grid");
-
-  // Local State instead of URL searchParams (fixes static export routing bugs)
-  const [searchQuery, setSearchQuery] = useState("");
-  const [statusFilter, setStatusFilter] = useState("all");
-  const [langFilter, setLangFilter] = useState("all");
-  const [favoritesOnly, setFavoritesOnly] = useState(false);
-  const [sortField, setSortField] = useState("created_at");
-  const [sortOrder, setSortOrder] = useState<"asc" | "desc">("desc");
-
-  const viewMode = viewModeState;
-
-  // Removed updateParam since we use local state now
 
   useEffect(() => {
+    async function loadData() {
+      try {
+        const sb = createClient();
+        const { data: { user } } = await sb.auth.getUser();
+        if (user?.user_metadata?.full_name) {
+          setUserName(user.user_metadata.full_name);
+        } else if (user?.email) {
+          setUserName(user.email.split("@")[0]);
+        }
+        
+        const [projectsRes, metricsRes] = await Promise.all([
+          listProjects(),
+          getDashboardMetrics()
+        ]);
+        
+        setProjects(projectsRes.projects || []);
+        setMetrics(metricsRes.metrics || {});
+      } catch (err) {
+        console.error("Failed to load dashboard data", err);
+      } finally {
+        setLoading(false);
+      }
+    }
     loadData();
   }, []);
-
-  const loadData = async () => {
-    try {
-      const [projData, metricData] = await Promise.all([
-        listProjects(),
-        getDashboardMetrics(),
-      ]);
-      setProjects(projData.projects);
-      setMetrics(metricData);
-    } catch (err) {
-      console.error("Failed to load dashboard data:", err);
-    } finally {
-      setLoading(false);
-    }
-  };
 
   const handleCreate = async () => {
     if (!newTitle.trim()) return;
     setCreating(true);
     try {
-      const { createProject } = await import("@/lib/api");
       const project = await createProject({ title: newTitle });
-      router.push(`/project/${project.id}`);
+      router.push(`/project?id=${project.id}`);
     } catch (err) {
       console.error("Failed to create project:", err);
     } finally {
@@ -70,301 +61,118 @@ function DashboardContent() {
     }
   };
 
-  // Actions
-  const handleFavorite = async (id: string, isFav: boolean) => {
-    // optimistic update
-    setProjects((prev) => prev.map((p) => (p.id === id ? { ...p, is_favorite: isFav } : p)));
-    try {
-      await toggleFavorite(id, isFav);
-      const metricData = await getDashboardMetrics();
-      setMetrics(metricData);
-    } catch (err) {
-      console.error(err);
-      // revert
-      setProjects((prev) => prev.map((p) => (p.id === id ? { ...p, is_favorite: !isFav } : p)));
+  const shown = projects.filter((p) => (p.title || "Untitled").toLowerCase().includes(q.toLowerCase()));
+
+  const statusMeta = (status: string) => {
+    switch(status) {
+      case "ready": return { label: "Ready", color: "var(--color-green-theme)", Icon: Play };
+      case "failed": return { label: "Failed — retry", color: "var(--color-red-theme)", Icon: AlertTriangle };
+      default: return { label: "Processing", color: "var(--color-amber-theme)", Icon: RefreshCw };
     }
   };
 
-  const handleDelete = async (id: string) => {
-    if (!confirm("Are you sure you want to delete this project?")) return;
-    setProjects((prev) => prev.filter((p) => p.id !== id));
-    try {
-      await deleteProject(id);
-      const metricData = await getDashboardMetrics();
-      setMetrics(metricData);
-    } catch (err) {
-      console.error(err);
-      loadData(); // reload on error
-    }
+  const getUpdatedAgo = (dateStr: string) => {
+    const diff = Date.now() - new Date(dateStr).getTime();
+    const hours = Math.floor(diff / (1000 * 60 * 60));
+    if (hours < 1) return "Just now";
+    if (hours < 24) return `${hours}h ago`;
+    return `${Math.floor(hours / 24)}d ago`;
+  };
+  
+  const extractLangs = (project: any) => {
+    if (!project.transcripts) return [];
+    return Array.from(new Set(project.transcripts.map((t: any) => t.language)));
   };
 
-  const handleDuplicate = async (id: string) => {
-    try {
-      const newProj = await duplicateProject(id);
-      router.push(`/project/${newProj.id}`);
-    } catch (err) {
-      console.error(err);
-      alert("Failed to duplicate project.");
-    }
-  };
+  if (loading) {
+    return <main className="flex-1 p-6 flex items-center justify-center"><p style={{color: "var(--color-text-secondary)"}}>Loading...</p></main>;
+  }
 
-  const handleDownload = async (project: Project) => {
-    // Download the latest export, or fallback to VTT if we can generate it client-side
-    // Currently, we just download the latest export url
-    const latestExport = project.exports?.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())[0];
-    if (latestExport && latestExport.url) {
-      window.open(latestExport.url, "_blank");
-    } else {
-      alert("No exports available for this project yet. Please go to the project page to export.");
-    }
-  };
-
-  // Bulk Actions
-  const handleBulkDelete = async () => {
-    if (!confirm(`Are you sure you want to delete ${selectedIds.length} projects?`)) return;
-    for (const id of selectedIds) {
-      try {
-        await deleteProject(id);
-      } catch (err) {
-        console.error("Failed to delete", id, err);
-      }
-    }
-    setSelectedIds([]);
-    loadData();
-  };
-
-  const handleBulkDownload = async () => {
-    const zip = new JSZip();
-    let added = 0;
-    
-    // We only process selected projects that have exports
-    for (const id of selectedIds) {
-      const p = projects.find(x => x.id === id);
-      if (!p) continue;
-      
-      const latestExport = p.exports?.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())[0];
-      if (latestExport && latestExport.url) {
-        try {
-          const res = await fetch(latestExport.url);
-          const blob = await res.blob();
-          const ext = latestExport.format === 'burned_mp4' ? 'mp4' : latestExport.format;
-          zip.file(`${p.title || 'Untitled'}_${p.id.slice(0, 8)}.${ext}`, blob);
-          added++;
-        } catch (err) {
-          console.error("Failed to fetch export for zip", p.title, err);
-        }
-      }
-    }
-    
-    if (added === 0) {
-      alert("None of the selected projects have downloadable exports.");
-      return;
-    }
-    
-    const content = await zip.generateAsync({ type: "blob" });
-    saveAs(content, "subbu_exports.zip");
-  };
-
-  // Filter & Sort Logic
-  const filteredProjects = useMemo(() => {
-    let result = [...projects];
-
-    if (searchQuery) {
-      const q = searchQuery.toLowerCase();
-      result = result.filter((p) => p.title?.toLowerCase().includes(q));
-    }
-    if (statusFilter !== "all") {
-      result = result.filter((p) => p.status === statusFilter);
-    }
-    if (favoritesOnly) {
-      result = result.filter((p) => p.is_favorite);
-    }
-    if (langFilter !== "all") {
-      result = result.filter((p) => {
-        // check if any transcript matches this language
-        return p.transcripts?.some((t) => t.language === langFilter);
-      });
-    }
-
-    result.sort((a, b) => {
-      let aVal: any = a.created_at;
-      let bVal: any = b.created_at;
-
-      if (sortField === "title") {
-        aVal = (a.title || "").toLowerCase();
-        bVal = (b.title || "").toLowerCase();
-      } else if (sortField === "duration_seconds") {
-        aVal = a.duration_seconds || 0;
-        bVal = b.duration_seconds || 0;
-      }
-
-      if (aVal < bVal) return sortOrder === "asc" ? -1 : 1;
-      if (aVal > bVal) return sortOrder === "asc" ? 1 : -1;
-      return 0;
-    });
-
-    return result;
-  }, [projects, searchQuery, statusFilter, langFilter, favoritesOnly, sortField, sortOrder]);
+  const totalVideos = metrics?.total_videos || 0;
+  const totalMins = Math.round(metrics?.total_minutes || 0);
+  const totalLangs = metrics?.distinct_languages || 0;
+  const storageGB = ((metrics?.storage_bytes || 0) / (1024 * 1024 * 1024)).toFixed(1);
 
   return (
-    <div style={{ maxWidth: "1400px", margin: "0 auto", padding: "40px 24px" }}>
-      {/* Overview Metrics */}
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(200px, 1fr))", gap: "16px", marginBottom: "40px" }}>
-        <MetricCard label="Total Videos" value={metrics?.metrics.total_videos} loading={loading} />
-        <MetricCard label="Minutes Processed" value={metrics?.metrics.total_minutes ? Math.round(metrics.metrics.total_minutes) : 0} loading={loading} />
-        <MetricCard label="Languages Used" value={metrics?.metrics.distinct_languages} loading={loading} />
-        <MetricCard
-          label="Storage Used"
-          value={metrics?.metrics.storage_bytes ? (metrics.metrics.storage_bytes / (1024 * 1024)).toFixed(1) + " MB" : "0 MB"}
-          loading={loading}
-        />
+    <main className="flex-1 overflow-y-auto p-6" style={{ background: "var(--color-bg-theme)" }}>
+      <div className="mb-6 flex flex-wrap items-center justify-between gap-3">
+        <div>
+          <h1 className="text-xl font-semibold">Good evening, {userName}</h1>
+          <p className="text-sm" style={{ color: "var(--color-text-secondary)" }}>{projects.length} projects · {totalLangs} languages</p>
+        </div>
+        <button 
+          onClick={() => setShowModal(true)}
+          className="flex items-center gap-2 rounded-xl px-4 py-2.5 text-sm font-medium transition-transform hover:scale-[1.02]" 
+          style={{ background: "var(--color-pill)", color: "var(--color-pill-text)" }}
+        >
+          <Upload size={16} /> Upload video
+        </button>
       </div>
 
-      <div className="flex flex-col lg:flex-row gap-6">
-        <div style={{ flex: 1 }}>
-          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "24px" }}>
-            <h1 style={{ fontSize: "1.8rem", fontWeight: 700 }}>My Projects</h1>
-            <div style={{ display: "flex", alignItems: "center", gap: "16px" }}>
-              {/* View Toggle moved from filters */}
-              <div style={{ display: "flex", background: "var(--color-bg-elevated)", borderRadius: "var(--radius-sm)", padding: "4px" }}>
-                <button
-                  onClick={() => setViewModeState("grid")}
-                  style={{
-                    padding: "6px 12px",
-                    background: viewMode === "grid" ? "var(--color-border)" : "transparent",
-                    border: "none",
-                    borderRadius: "4px",
-                    cursor: "pointer",
-                    color: viewMode === "grid" ? "var(--color-text-primary)" : "var(--color-text-secondary)",
-                    fontWeight: viewMode === "grid" ? 600 : 400,
-                  }}
-                >
-                  Grid
-                </button>
-                <button
-                  onClick={() => setViewModeState("table")}
-                  style={{
-                    padding: "6px 12px",
-                    background: viewMode === "table" ? "var(--color-border)" : "transparent",
-                    border: "none",
-                    borderRadius: "4px",
-                    cursor: "pointer",
-                    color: viewMode === "table" ? "var(--color-text-primary)" : "var(--color-text-secondary)",
-                    fontWeight: viewMode === "table" ? 600 : 400,
-                  }}
-                >
-                  Table
-                </button>
-              </div>
-              <button className="btn-primary" onClick={() => setShowModal(true)} style={{ display: "flex", alignItems: "center", gap: "8px" }}>
-                <span style={{ fontSize: "1.2rem" }}>+</span> New Project
-              </button>
-            </div>
+      <div className="mb-6 grid grid-cols-2 gap-4 lg:grid-cols-4">
+        {[
+          ["Videos", totalVideos], 
+          ["Minutes captioned", totalMins], 
+          ["Languages", totalLangs], 
+          ["Storage", `${storageGB} GB`]
+        ].map(([l, v]) => (
+          <div key={l as string} className="rounded-2xl p-4 transition-transform hover:scale-[1.02]" style={{ background: "var(--color-card)", border: "1px solid var(--color-border-theme)" }}>
+            <p className="mb-1 text-xs" style={{ color: "var(--color-text-secondary)" }}>{l}</p>
+            <p className="text-2xl font-semibold">{v}</p>
           </div>
+        ))}
+      </div>
 
-          <DashboardFilters
-            searchQuery={searchQuery}
-            onSearchChange={(q) => setSearchQuery(q)}
-            statusFilter={statusFilter}
-            onStatusChange={(s) => setStatusFilter(s)}
-            langFilter={langFilter}
-            onLangChange={(l) => setLangFilter(l)}
-            favoritesOnly={favoritesOnly}
-            onFavoritesToggle={() => setFavoritesOnly(!favoritesOnly)}
-            sortField={sortField}
-            onSortChange={(f) => setSortField(f)}
-            sortOrder={sortOrder}
-            onSortOrderChange={() => setSortOrder(sortOrder === "asc" ? "desc" : "asc")}
+      <div className="mb-3 flex items-center justify-between gap-3">
+        <h2 className="text-base font-semibold">Your projects</h2>
+        <div className="relative w-64">
+          <Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2" style={{ color: "var(--color-text-secondary)" }} />
+          <input
+            value={q} onChange={(e) => setQ(e.target.value)} placeholder="Search projects"
+            className="w-full rounded-xl py-2 pl-9 pr-3 text-sm outline-none"
+            style={{ background: "var(--color-input-bg)", border: "1px solid var(--color-border-theme)", color: "var(--color-text-primary)" }}
           />
-
-          {loading ? (
-            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(300px, 1fr))", gap: "20px" }}>
-              {[1, 2, 3].map((i) => <div key={i} className="card animate-shimmer" style={{ height: "180px" }} />)}
-            </div>
-          ) : filteredProjects.length === 0 && projects.length === 0 ? (
-            <div className="card animate-fade-in" style={{ textAlign: "center", padding: "80px 40px" }}>
-              <div style={{ fontSize: "3rem", marginBottom: "16px" }}>🎬</div>
-              <h2 style={{ fontSize: "1.3rem", fontWeight: 600, marginBottom: "8px" }}>No projects yet</h2>
-              <p style={{ color: "var(--color-text-secondary)", marginBottom: "24px", fontSize: "0.95rem" }}>
-                Upload your first video to get started with AI subtitle generation.
-              </p>
-              <button className="btn-primary" onClick={() => setShowModal(true)}>Upload Your First Video</button>
-            </div>
-          ) : viewMode === "grid" ? (
-            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(280px, 1fr))", gap: "20px" }}>
-              {filteredProjects.map((p) => (
-                <ProjectCard
-                  key={p.id}
-                  project={p}
-                  onFavorite={handleFavorite}
-                  onDelete={handleDelete}
-                  onDuplicate={handleDuplicate}
-                  onDownload={handleDownload}
-                />
-              ))}
-            </div>
-          ) : (
-            <ProjectTable
-              projects={filteredProjects}
-              selectedIds={selectedIds}
-              onSelect={(id, checked) => setSelectedIds(prev => checked ? [...prev, id] : prev.filter(x => x !== id))}
-              onSelectAll={(checked) => setSelectedIds(checked ? filteredProjects.map(p => p.id) : [])}
-              onFavorite={handleFavorite}
-              onDelete={handleDelete}
-              onDuplicate={handleDuplicate}
-              onDownload={handleDownload}
-              sortField={sortField}
-              sortOrder={sortOrder}
-              onSort={(f) => {
-                if (sortField === f) {
-                  setSortOrder(sortOrder === "asc" ? "desc" : "asc");
-                } else {
-                  setSortField(f);
-                  setSortOrder("asc");
-                }
-              }}
-              onNavigate={(id) => router.push(`/project/${id}`)}
-            />
-          )}
         </div>
       </div>
 
-      {/* Bulk Action Bar */}
-      {selectedIds.length > 0 && viewMode === "table" && (
-        <div
-          style={{
-            position: "fixed",
-            bottom: "24px",
-            left: "50%",
-            transform: "translateX(-50%)",
-            background: "var(--color-bg-elevated)",
-            border: "1px solid var(--color-primary)",
-            boxShadow: "0 10px 25px -5px rgba(0,0,0,0.5)",
-            padding: "16px 24px",
-            borderRadius: "var(--radius-lg)",
-            display: "flex",
-            alignItems: "center",
-            gap: "24px",
-            zIndex: 50,
-            animation: "slide-up 0.3s ease",
-          }}
-        >
-          <span style={{ fontWeight: 600, color: "var(--color-text-primary)" }}>
-            {selectedIds.length} selected
-          </span>
-          <div style={{ width: "1px", height: "24px", background: "var(--color-border)" }} />
-          <div style={{ display: "flex", gap: "12px" }}>
-            <button className="btn-secondary" onClick={handleBulkDownload}>
-              📥 Download Zip
-            </button>
-            <button
-              className="btn-secondary"
-              style={{ color: "#ef4444", borderColor: "rgba(239, 68, 68, 0.3)" }}
-              onClick={handleBulkDelete}
-            >
-              🗑️ Delete Selected
-            </button>
-          </div>
+      {shown.length === 0 ? (
+        <div className="py-20 text-center flex flex-col items-center">
+          <p className="mb-4 text-sm" style={{ color: "var(--color-text-secondary)" }}>No projects found. Ready to caption your first video?</p>
+          <button 
+            onClick={() => setShowModal(true)}
+            className="flex items-center gap-2 rounded-xl px-4 py-2.5 text-sm font-medium" 
+            style={{ background: "var(--color-pill)", color: "var(--color-pill-text)" }}
+          >
+            <Upload size={16} /> Upload video
+          </button>
+        </div>
+      ) : (
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-3">
+          {shown.map((p) => {
+            const m = statusMeta(p.status);
+            const langs = extractLangs(p) as string[];
+            return (
+              <button
+                key={p.id} onClick={() => router.push(`/project?id=${p.id}`)}
+                className="rounded-2xl p-3 text-left transition-transform hover:scale-[1.01]"
+                style={{ background: "var(--color-card)", border: "1px solid var(--color-border-theme)" }}
+              >
+                <div className="mb-3 flex h-28 items-center justify-center rounded-xl overflow-hidden relative" style={{ background: "var(--color-accent-soft)" }}>
+                  <m.Icon size={24} style={{ color: m.color, zIndex: 2 }} />
+                </div>
+                <p className="mb-2 text-sm font-medium truncate">{p.title || "Untitled"}</p>
+                <div className="flex flex-wrap items-center gap-1.5">
+                  <span className="rounded-md px-2 py-0.5 text-[11px] font-medium" style={{ color: m.color, background: `${m.color}22` }}>{m.label}</span>
+                  {langs.length > 0 && (
+                    <span className="rounded-md px-2 py-0.5 text-[11px] font-medium" style={{ background: "var(--color-accent-soft)", color: "var(--color-accent)" }}>
+                      {langs.map((l) => LANGS[l] || l).join(" · ")}
+                    </span>
+                  )}
+                  <span className="ml-auto text-[11px]" style={{ color: "var(--color-text-muted)" }}>{getUpdatedAgo(p.created_at)}</span>
+                </div>
+              </button>
+            );
+          })}
         </div>
       )}
 
@@ -374,36 +182,44 @@ function DashboardContent() {
           style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.6)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 100, backdropFilter: "blur(4px)" }}
           onClick={() => setShowModal(false)}
         >
-          <div className="card glass animate-fade-in" style={{ width: "100%", maxWidth: "440px", padding: "32px" }} onClick={(e) => e.stopPropagation()}>
+          <div className="animate-fade-in" style={{ width: "100%", maxWidth: "440px", padding: "32px", background: "var(--color-card)", borderRadius: "16px", border: "1px solid var(--color-border-theme)" }} onClick={(e) => e.stopPropagation()}>
             <h2 style={{ fontSize: "1.3rem", fontWeight: 700, marginBottom: "20px" }}>Create New Project</h2>
-            <input className="input" placeholder="Project title..." value={newTitle} onChange={(e) => setNewTitle(e.target.value)} autoFocus onKeyDown={(e) => e.key === "Enter" && handleCreate()} />
-            <div style={{ display: "flex", gap: "12px", marginTop: "20px", justifyContent: "flex-end" }}>
-              <button className="btn-secondary" onClick={() => setShowModal(false)}>Cancel</button>
-              <button className="btn-primary" onClick={handleCreate} disabled={creating || !newTitle.trim()}>{creating ? "Creating..." : "Create & Upload"}</button>
+            <input 
+              placeholder="Project title..." 
+              value={newTitle} 
+              onChange={(e) => setNewTitle(e.target.value)} 
+              autoFocus 
+              onKeyDown={(e) => e.key === "Enter" && handleCreate()}
+              className="w-full rounded-xl py-2 px-3 text-sm outline-none"
+              style={{ background: "var(--color-input-bg)", border: "1px solid var(--color-border-theme)", color: "var(--color-text-primary)" }}
+            />
+            <div style={{ display: "flex", gap: "12px", marginTop: "24px", justifyContent: "flex-end" }}>
+              <button 
+                onClick={() => setShowModal(false)}
+                className="px-4 py-2 rounded-lg text-sm"
+                style={{ background: "var(--color-input-bg)", color: "var(--color-text-primary)", border: "1px solid var(--color-border-theme)" }}
+              >
+                Cancel
+              </button>
+              <button 
+                onClick={handleCreate} 
+                disabled={creating || !newTitle.trim()}
+                className="px-4 py-2 rounded-lg text-sm font-medium"
+                style={{ background: "var(--color-pill)", color: "var(--color-pill-text)", opacity: (creating || !newTitle.trim()) ? 0.5 : 1 }}
+              >
+                {creating ? "Creating..." : "Create & Upload"}
+              </button>
             </div>
           </div>
         </div>
       )}
-    </div>
-  );
-}
-
-function MetricCard({ label, value, loading }: { label: string; value: any; loading: boolean }) {
-  return (
-    <div className="card glass" style={{ padding: "24px", display: "flex", flexDirection: "column", gap: "8px" }}>
-      <span style={{ color: "var(--color-text-secondary)", fontSize: "0.9rem", fontWeight: 500 }}>{label}</span>
-      {loading ? (
-        <div className="animate-shimmer" style={{ height: "36px", width: "60%", borderRadius: "4px" }} />
-      ) : (
-        <span style={{ fontSize: "2rem", fontWeight: 700 }}>{value !== undefined && value !== null ? value : "—"}</span>
-      )}
-    </div>
+    </main>
   );
 }
 
 export default function DashboardPage() {
   return (
-    <Suspense fallback={<div className="p-8 text-center">Loading dashboard...</div>}>
+    <Suspense fallback={<div className="p-8 text-center" style={{color: "var(--color-text-secondary)"}}>Loading dashboard...</div>}>
       <DashboardContent />
     </Suspense>
   );

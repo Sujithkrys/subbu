@@ -228,3 +228,14 @@ export async function getUserUsage(): Promise<{
   if (!res.ok) throw new Error("Failed to fetch usage");
   return res.json();
 }
+
+export async function getUserSettings(): Promise<{ user_id: string; theme: string }> {
+  return apiFetch<{ user_id: string; theme: string }>("/projects/user/settings");
+}
+
+export async function updateUserSettings(theme: string): Promise<{ user_id: string; theme: string }> {
+  return apiFetch<{ user_id: string; theme: string }>("/projects/user/settings", {
+    method: "PATCH",
+    body: JSON.stringify({ theme }),
+  });
+}

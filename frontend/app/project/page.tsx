@@ -1,621 +1,468 @@
 "use client";
 
-import { Suspense, useEffect, useState } from "react";
+import { useState, useEffect, useRef, Suspense, useCallback } from "react";
 import { useSearchParams, useRouter } from "next/navigation";
 import {
+  Clapperboard, Captions, Languages, Paintbrush, Download,
+  ChevronDown, ChevronLeft, Plus, Trash2, Play, Pause
+} from "lucide-react";
+import {
   getProject,
-  startTranscription,
   startTranslation,
   saveStyle,
   startExport,
   updateTranscriptSegments,
 } from "@/lib/api";
-import type {
-  ProjectDetailResponse,
-  Transcript,
-  StylePreset,
-  ExportFormat,
-  Job,
-  Segment,
-} from "@/lib/types";
-import Sidebar from "@/components/Sidebar";
-import VideoUploader from "@/components/VideoUploader";
-import SubtitlePreviewPlayer from "@/components/SubtitlePreviewPlayer";
-import SubtitleStylePicker from "@/components/SubtitleStylePicker";
-import LanguageSelector from "@/components/LanguageSelector";
-import ExportPanel from "@/components/ExportPanel";
-import JobStatusBadge from "@/components/JobStatusBadge";
-import TranscriptEditor from "@/components/TranscriptEditor";
-import KaraokePlayer from "@/components/KaraokePlayer";
+import type { ProjectDetailResponse, Transcript, StylePreset, Segment } from "@/lib/types";
+import { STYLE_PRESETS } from "@/lib/types";
 
-function ProjectEditor() {
+const LANGS: Record<string, string> = { te: "Telugu", hi: "Hindi", en: "English", ta: "Tamil", ml: "Malayalam", kn: "Kannada", bn: "Bengali", mr: "Marathi", gu: "Gujarati" };
+const PRESETS = [
+  { id: "minimal", name: "Minimal", css: { fontSize: 14, background: "rgba(0,0,0,0.6)", fontWeight: 400 } },
+  { id: "bold", name: "Bold Pop", css: { fontSize: 18, background: "rgba(0,0,0,0.8)", fontWeight: 700 } },
+  { id: "karaoke", name: "Karaoke", css: { fontSize: 16, background: "rgba(116,105,182,0.9)", fontWeight: 600 } },
+  { id: "classic", name: "Classic", css: { fontSize: 15, background: "rgba(0,0,0,0.75)", fontWeight: 400, textShadow: "1px 1px 2px #000" } },
+];
+
+function EditorContent() {
   const searchParams = useSearchParams();
   const router = useRouter();
-  const projectId = searchParams.get("id") as string;
+  const projectId = searchParams.get("id");
 
   const [project, setProject] = useState<ProjectDetailResponse | null>(null);
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-
-  // Upload state
-  const [uploadUrl, setUploadUrl] = useState<string | null>(null);
-  const [uploadComplete, setUploadComplete] = useState(false);
-
-  // Transcript state
-  const [selectedTranscript, setSelectedTranscript] = useState<Transcript | null>(null);
-  const [isTranscribing, setIsTranscribing] = useState(false);
-
-  // Trim state
-  const [trimStart, setTrimStart] = useState<number>(0);
-  const [trimEnd, setTrimEnd] = useState<number | null>(null);
-  const [videoDuration, setVideoDuration] = useState<number | null>(null);
-  const [wordTimestamps, setWordTimestamps] = useState<boolean>(false);
-
-  // Translation state
-  const [sourceLanguage, setSourceLanguage] = useState("");
-  const [targetLanguage, setTargetLanguage] = useState("");
-  const [isTranslating, setIsTranslating] = useState(false);
-
-  // Style state
-  const [selectedPreset, setSelectedPreset] = useState<StylePreset | null>(null);
-
-  // Export state
-  const [isExporting, setIsExporting] = useState(false);
+  
+  const [tool, setTool] = useState<"captions" | "languages" | "style">("captions");
+  const [lang, setLang] = useState<string>("");
+  const [time, setTime] = useState(0);
+  const [playing, setPlaying] = useState(false);
+  const [selectedId, setSelectedId] = useState<number | null>(null);
+  const [exportOpen, setExportOpen] = useState(false);
+  const [toast, setToast] = useState("");
+  
+  const videoRef = useRef<HTMLVideoElement>(null);
 
   useEffect(() => {
+    if (!projectId) {
+      router.push("/dashboard");
+      return;
+    }
     loadProject();
   }, [projectId]);
 
   const loadProject = async () => {
     try {
-      const data = await getProject(projectId);
+      const data = await getProject(projectId!);
       setProject(data);
-
-      // Set upload URL from project creation (stored in session)
-      if (data.video_download_url) {
-        setUploadComplete(true);
+      if (data.transcripts && data.transcripts.length > 0) {
+        setLang(data.transcripts[0].language);
       }
-
-      // Select the first transcript if available
-      if (data.transcripts?.length > 0) {
-        const asrTranscript = data.transcripts.find((t) => t.source === "asr");
-        setSelectedTranscript(asrTranscript || data.transcripts[0]);
-        if (asrTranscript) {
-          setSourceLanguage(asrTranscript.language);
-        }
-      }
-
-      // Load style
-      if (data.style) {
-        setSelectedPreset({
-          name: "Custom",
-          description: "",
-          font: data.style.font,
-          color: data.style.color,
-          position: data.style.position as "top" | "center" | "bottom",
-          animation_type: data.style.animation_type as any,
-        });
-      }
-    } catch (err: any) {
-      setError(err.message);
+    } catch (err) {
+      console.error(err);
+      fireToast("Failed to load project");
     } finally {
       setLoading(false);
     }
   };
 
-  const handleTranscribe = async () => {
-    setIsTranscribing(true);
+  const fireToast = (msg: string) => { 
+    setToast(msg); 
+    setTimeout(() => setToast(""), 2600); 
+  };
+
+  const currentTranscript = project?.transcripts?.find(t => t.language === lang);
+  const captions = currentTranscript?.segments || [];
+  const dur = project?.duration_seconds || 30; // fallback dur
+
+  // Playback sync from real video
+  const handleTimeUpdate = () => {
+    if (videoRef.current) {
+      setTime(videoRef.current.currentTime);
+    }
+  };
+
+  const togglePlay = () => {
+    if (!videoRef.current) return;
+    if (playing) {
+      videoRef.current.pause();
+    } else {
+      videoRef.current.play();
+    }
+    setPlaying(!playing);
+  };
+
+  const seek = (newTime: number) => {
+    if (videoRef.current) {
+      videoRef.current.currentTime = newTime;
+    }
+    setTime(newTime);
+  };
+
+  const currentCaption = captions.find(c => time >= c.start && time <= c.end);
+
+  // Auto-save logic
+  const saveSegments = async (newSegments: Segment[]) => {
+    if (!currentTranscript || !projectId) return;
     try {
-      await startTranscription(projectId, {
-        source_language: sourceLanguage || undefined,
-        trim_start: trimStart > 0 ? trimStart : undefined,
-        trim_end: trimEnd !== null ? trimEnd : undefined,
-        word_timestamps: wordTimestamps || undefined,
-      });
-      // Polling will pick up the result
-    } catch (err: any) {
-      setError(err.message);
-    } finally {
-      setIsTranscribing(false);
+      await updateTranscriptSegments(projectId, currentTranscript.id, newSegments);
+    } catch (err) {
+      console.error("Save failed", err);
     }
   };
 
-  const handleTranslate = async () => {
-    if (!targetLanguage) return;
-    setIsTranslating(true);
+  const setCaptionText = (index: number, value: string) => {
+    const newCaps = [...captions];
+    newCaps[index] = { ...newCaps[index], text: value };
+    
+    setProject(prev => {
+      if (!prev) return prev;
+      const tIdx = prev.transcripts.findIndex(t => t.id === currentTranscript?.id);
+      if (tIdx === -1) return prev;
+      const newTranscripts = [...prev.transcripts];
+      newTranscripts[tIdx] = { ...newTranscripts[tIdx], segments: newCaps };
+      return { ...prev, transcripts: newTranscripts };
+    });
+    
+    // In a real app we would debounce this properly.
+    // For this prototype, we'll do an immediate save since user types slowly or debounce in wrapper.
+    if (saveTimeoutRef.current) clearTimeout(saveTimeoutRef.current);
+    saveTimeoutRef.current = setTimeout(() => {
+      saveSegments(newCaps);
+    }, 800);
+  };
+  const saveTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+
+  const addCaption = () => {
+    const last = captions[captions.length - 1];
+    const start = last ? Math.min(last.end + 0.1, dur - 3) : 0;
+    const end = Math.min(start + 3, dur);
+    const newCaps = [...captions, { start, end, text: "New caption" }];
+    
+    setProject(prev => {
+      if (!prev) return prev;
+      const tIdx = prev.transcripts.findIndex(t => t.id === currentTranscript?.id);
+      const newTranscripts = [...prev.transcripts];
+      newTranscripts[tIdx] = { ...newTranscripts[tIdx], segments: newCaps };
+      return { ...prev, transcripts: newTranscripts };
+    });
+    setSelectedId(newCaps.length - 1);
+    saveSegments(newCaps);
+  };
+
+  const removeCaption = (index: number) => {
+    const newCaps = captions.filter((_, i) => i !== index);
+    setProject(prev => {
+      if (!prev) return prev;
+      const tIdx = prev.transcripts.findIndex(t => t.id === currentTranscript?.id);
+      const newTranscripts = [...prev.transcripts];
+      newTranscripts[tIdx] = { ...newTranscripts[tIdx], segments: newCaps };
+      return { ...prev, transcripts: newTranscripts };
+    });
+    saveSegments(newCaps);
+  };
+
+  const addLanguage = async (code: string) => {
+    if (!projectId) return;
+    const existing = project?.transcripts.map(t => t.language) || [];
+    if (existing.includes(code)) return;
+    
+    fireToast(`${LANGS[code]} translation starting...`);
     try {
-      await startTranslation(projectId, {
-        target_language: targetLanguage,
-        source_language: sourceLanguage || undefined,
-      });
-    } catch (err: any) {
-      setError(err.message);
-    } finally {
-      setIsTranslating(false);
+      await startTranslation(projectId, { target_language: code });
+      fireToast(`${LANGS[code]} added — auto-translated, review before export`);
+      loadProject(); // Reload to get new transcript
+    } catch (err) {
+      console.error(err);
+      fireToast("Translation failed");
     }
   };
 
-  const handleStyleChange = async (preset: StylePreset) => {
-    setSelectedPreset(preset);
+  const exportSrt = () => {
+    const pad = (n: number) => String(n).padStart(2, "0");
+    const ts = (sec: number) => `00:${pad(Math.floor(sec / 60))}:${pad(Math.floor(sec % 60))},000`;
+    const srt = captions.map((c, i) => `${i + 1}\n${ts(c.start)} --> ${ts(c.end)}\n${c.text}\n`).join("\n");
+    const url = URL.createObjectURL(new Blob([srt], { type: "text/plain" }));
+    const a = document.createElement("a");
+    a.href = url; a.download = `${project?.title || "Project"}_${lang}.srt`; a.click();
+    URL.revokeObjectURL(url);
+    setExportOpen(false);
+    fireToast(`Exported ${LANGS[lang] || lang} captions (.srt)`);
+  };
+
+  const triggerBurnExport = async () => {
+    setExportOpen(false);
+    if (!projectId) return;
     try {
-      await saveStyle(projectId, {
-        font: preset.font,
-        color: preset.color,
-        position: preset.position,
-        animation_type: preset.animation_type,
-      });
-    } catch (err: any) {
-      console.error("Failed to save style:", err);
+      await startExport(projectId, { format: "burned_mp4", burn_in: true, transcript_id: currentTranscript?.id });
+      fireToast("Burned-in MP4 render started");
+    } catch (err) {
+      console.error(err);
+      fireToast("Export failed to start");
     }
   };
 
-  const handleExport = async (format: ExportFormat, burnIn: boolean) => {
-    setIsExporting(true);
-    try {
-      await startExport(projectId, {
-        format,
-        burn_in: burnIn,
-        transcript_id: selectedTranscript?.id,
-      });
-    } catch (err: any) {
-      setError(err.message);
-    } finally {
-      setIsExporting(false);
-    }
-  };
-
-  const handleSaveTranscript = async (updatedSegments: Segment[]) => {
-    if (!selectedTranscript) return;
-    try {
-      const updated = await updateTranscriptSegments(projectId, selectedTranscript.id, updatedSegments);
-      setSelectedTranscript(updated);
-      if (project) {
-        const updatedTranscripts = project.transcripts.map((t) =>
-          t.id === selectedTranscript.id ? updated : t
-        );
-        setProject({
-          ...project,
-          transcripts: updatedTranscripts,
-        });
-      }
-    } catch (err: any) {
-      setError(err.message || "Failed to save transcript edits");
-      throw err;
-    }
-  };
-
-  const handleStatusUpdate = (jobs: Job[], projectStatus: string) => {
-    // Reload project data when a job completes
-    const justCompleted = jobs.some((j) => j.status === "done");
-    if (justCompleted) {
-      loadProject();
-    }
-  };
-
-  if (loading) {
-    return (
-      <div
-        style={{
-          display: "flex",
-          alignItems: "center",
-          justifyContent: "center",
-          minHeight: "calc(100vh - 64px)",
-        }}
-      >
-        <div
-          style={{
-            width: "40px",
-            height: "40px",
-            border: "3px solid var(--color-border)",
-            borderTopColor: "var(--color-primary)",
-            borderRadius: "50%",
-            animation: "spin-slow 0.8s linear infinite",
-          }}
-        />
-      </div>
-    );
+  if (loading || !project) {
+    return <div className="flex-1 flex items-center justify-center h-screen" style={{ background: "var(--color-bg-theme)" }}><p style={{color: "var(--color-text-secondary)"}}>Loading editor...</p></div>;
   }
 
-  if (error && !project) {
-    return (
-      <div
-        style={{
-          display: "flex",
-          flexDirection: "column",
-          alignItems: "center",
-          justifyContent: "center",
-          minHeight: "calc(100vh - 64px)",
-          gap: "16px",
-        }}
-      >
-        <p style={{ color: "#ef4444" }}>Error: {error}</p>
-        <button className="btn-secondary" onClick={() => router.push("/dashboard")}>
-          Back to Dashboard
-        </button>
-      </div>
-    );
-  }
+  const allLangs = project.transcripts.map(t => t.language);
+  const activePreset = PRESETS.find(p => p.name === project.style?.font) || PRESETS[0];
+
+  const tools = [
+    { id: "captions", label: "Captions", icon: Captions },
+    { id: "languages", label: "Languages", icon: Languages },
+    { id: "style", label: "Style", icon: Paintbrush },
+  ] as const;
+
+  const fmt = (sec: number) => `00:${String(Math.floor(sec / 60)).padStart(2, "0")}:${String(Math.floor(sec % 60)).padStart(2, "0")}`;
 
   return (
-    <div style={{ display: "flex" }}>
-      {/* Sidebar */}
-      <Sidebar projectId={projectId} projectTitle={project?.title || undefined} />
-
-      {/* Main Content */}
-      <div
-        style={{
-          flex: 1,
-          padding: "32px 40px",
-          maxWidth: "1000px",
-        }}
-      >
-        {/* Job Status */}
-        <div style={{ marginBottom: "32px" }}>
-          <JobStatusBadge
-            projectId={projectId}
-            onStatusUpdate={handleStatusUpdate}
-          />
+    <div className="flex h-screen flex-1 flex-col font-sans" style={{ background: "var(--color-bg-theme)", color: "var(--color-text-primary)" }}>
+      {/* top bar */}
+      <header className="flex items-center justify-between px-4 py-2.5" style={{ borderBottom: "1px solid var(--color-border-theme)" }}>
+        <div className="flex items-center gap-2">
+          <button onClick={() => router.push("/dashboard")} className="rounded-lg p-1.5 hover:opacity-70 transition-opacity">
+            <ChevronLeft size={17} />
+          </button>
+          <span className="text-sm font-medium">{project.title || "Untitled"}</span>
+          <span className="rounded-md px-2 py-0.5 text-[11px] font-medium" style={{ color: "var(--color-green-theme)", background: "rgba(76,175,125,0.15)" }}>
+            Ready
+          </span>
         </div>
-
-        {/* Error Banner */}
-        {error && (
-          <div
-            className="animate-fade-in"
-            style={{
-              padding: "12px 16px",
-              borderRadius: "var(--radius-sm)",
-              background: "rgba(239,68,68,0.1)",
-              border: "1px solid rgba(239,68,68,0.25)",
-              color: "#ef4444",
-              fontSize: "0.9rem",
-              marginBottom: "24px",
-              display: "flex",
-              justifyContent: "space-between",
-              alignItems: "center",
-            }}
+        <div className="relative">
+          <button
+            onClick={() => setExportOpen((v) => !v)}
+            className="flex items-center gap-1.5 rounded-lg px-3.5 py-1.5 text-xs font-medium transition-transform hover:scale-105"
+            style={{ background: "var(--color-pill)", color: "var(--color-pill-text)" }}
           >
-            <span>{error}</span>
-            <button
-              onClick={() => setError(null)}
-              style={{
-                background: "none",
-                border: "none",
-                color: "#ef4444",
-                cursor: "pointer",
-                fontSize: "1.2rem",
-              }}
-            >
-              ×
-            </button>
-          </div>
-        )}
-
-        {/* Section: Upload */}
-        <section id="section-upload" style={{ marginBottom: "48px" }}>
-          <h2
-            style={{
-              fontSize: "1.3rem",
-              fontWeight: 700,
-              marginBottom: "20px",
-              display: "flex",
-              alignItems: "center",
-              gap: "10px",
-            }}
-          >
-            <span>📤</span> Upload Video
-          </h2>
-          {!uploadComplete && !project?.video_download_url ? (
-            <VideoUploader
-              uploadUrl={uploadUrl}
-              onUploadComplete={() => {
-                setUploadComplete(true);
-                handleTranscribe();
-              }}
-              onUploadError={(err) => setError(err)}
-            />
-          ) : (
-            <div
-              className="card"
-              style={{
-                padding: "16px",
-                display: "flex",
-                flexDirection: "column",
-                gap: "16px",
-              }}
-            >
-              <div style={{ display: "flex", alignItems: "center", gap: "12px" }}>
-                <span className="badge badge-success">✓ Uploaded</span>
-                <span style={{ color: "var(--color-text-secondary)", fontSize: "0.9rem" }}>
-                  Video uploaded successfully
-                </span>
-              </div>
-
-              {!selectedTranscript && (
-                <>
-                  {/* Trim Controls */}
-                  <div
-                    style={{
-                      background: "rgba(255,255,255,0.03)",
-                      borderRadius: "var(--radius-md)",
-                      padding: "16px",
-                      border: "1px solid var(--color-border)",
-                    }}
-                  >
-                    <p style={{ fontWeight: 600, fontSize: "0.9rem", marginBottom: "12px" }}>
-                      ✂️ Trim Video <span style={{ fontWeight: 400, color: "var(--color-text-muted)", fontSize: "0.8rem" }}>(optional — only process part of the video)</span>
-                    </p>
-                    <div style={{ display: "flex", gap: "16px", flexWrap: "wrap" }}>
-                      <label style={{ display: "flex", flexDirection: "column", gap: "4px", flex: 1, minWidth: "120px" }}>
-                        <span style={{ fontSize: "0.8rem", color: "var(--color-text-secondary)" }}>Start (seconds)</span>
-                        <input
-                          type="number"
-                          className="input"
-                          min={0}
-                          step={0.5}
-                          value={trimStart}
-                          onChange={(e) => setTrimStart(parseFloat(e.target.value) || 0)}
-                          placeholder="0"
-                          style={{ padding: "8px 12px", fontSize: "0.9rem" }}
-                        />
-                      </label>
-                      <label style={{ display: "flex", flexDirection: "column", gap: "4px", flex: 1, minWidth: "120px" }}>
-                        <span style={{ fontSize: "0.8rem", color: "var(--color-text-secondary)" }}>End (seconds)</span>
-                        <input
-                          type="number"
-                          className="input"
-                          min={0}
-                          step={0.5}
-                          value={trimEnd ?? ""}
-                          onChange={(e) => setTrimEnd(e.target.value ? parseFloat(e.target.value) : null)}
-                          placeholder="end of video"
-                          style={{ padding: "8px 12px", fontSize: "0.9rem" }}
-                        />
-                      </label>
-                    </div>
-                    {(trimStart > 0 || trimEnd !== null) && (
-                      <p style={{ fontSize: "0.8rem", color: "var(--color-accent-light)", marginTop: "8px" }}>
-                        Processing: {trimStart}s → {trimEnd !== null ? `${trimEnd}s` : "end"} ({trimEnd !== null ? `${(trimEnd - trimStart).toFixed(1)}s` : "remainder"})
-                      </p>
-                    )}
-                  </div>
-
-                  {/* Word Timestamps / Karaoke toggle */}
-                  <label
-                    style={{
-                      display: "flex",
-                      alignItems: "center",
-                      gap: "10px",
-                      cursor: "pointer",
-                      fontSize: "0.9rem",
-                      color: "var(--color-text-secondary)",
-                      userSelect: "none",
-                    }}
-                  >
-                    <input
-                      type="checkbox"
-                      checked={wordTimestamps}
-                      onChange={(e) => setWordTimestamps(e.target.checked)}
-                      style={{ width: "16px", height: "16px", accentColor: "var(--color-primary)" }}
-                    />
-                    <span>
-                      Enable <strong style={{ color: "var(--color-text-primary)" }}>Karaoke mode</strong>{" "}
-                      <span style={{ fontSize: "0.8rem", color: "var(--color-text-muted)" }}>
-                        (requests word-level timestamps from Whisper — slower)
-                      </span>
-                    </span>
-                  </label>
-
-                  <button
-                    className="btn-primary"
-                    onClick={handleTranscribe}
-                    disabled={isTranscribing}
-                    style={{ alignSelf: "flex-start", padding: "10px 20px", fontSize: "0.9rem" }}
-                  >
-                    {isTranscribing ? "Starting..." : "🎤 Start Transcription"}
-                  </button>
-                </>
-              )}
+            <Download size={13} /> Export <ChevronDown size={12} />
+          </button>
+          {exportOpen && (
+            <div className="absolute right-0 top-9 z-20 w-44 rounded-xl p-1.5 shadow-xl animate-fade-in" style={{ background: "var(--color-card)", border: "1px solid var(--color-border-theme)" }}>
+              <button onClick={exportSrt} className="w-full rounded-lg px-3 py-2 text-left text-xs hover:opacity-70 transition-opacity">SRT file ({LANGS[lang] || lang})</button>
+              <button onClick={() => { setExportOpen(false); fireToast("VTT export queued"); }} className="w-full rounded-lg px-3 py-2 text-left text-xs hover:opacity-70 transition-opacity">VTT file</button>
+              <button onClick={triggerBurnExport} className="w-full rounded-lg px-3 py-2 text-left text-xs hover:opacity-70 transition-opacity">Burned-in MP4</button>
             </div>
           )}
-        </section>
+        </div>
+      </header>
 
-        {/* Section: Preview */}
-        <section id="section-preview" style={{ marginBottom: "48px" }}>
-          <h2
-            style={{
-              fontSize: "1.3rem",
-              fontWeight: 700,
-              marginBottom: "20px",
-              display: "flex",
-              alignItems: "center",
-              gap: "10px",
-            }}
-          >
-            <span>🖥️</span> Preview
-          </h2>
-          <SubtitlePreviewPlayer
-            videoUrl={project?.video_download_url || null}
-            segments={selectedTranscript?.segments || []}
-            style={
-              selectedPreset
-                ? {
-                    font: selectedPreset.font,
-                    color: selectedPreset.color,
-                    position: selectedPreset.position,
-                    animation_type: selectedPreset.animation_type,
-                  }
-                : null
-            }
-          />
-        </section>
-
-        {/* Section: Transcript */}
-        {(project?.transcripts?.length ?? 0) > 0 && (
-          <section id="section-transcript" style={{ marginBottom: "48px" }}>
-            <h2
-              style={{
-                fontSize: "1.3rem",
-                fontWeight: 700,
-                marginBottom: "20px",
-                display: "flex",
-                alignItems: "center",
-                gap: "10px",
-              }}
+      <div className="flex min-h-0 flex-1">
+        {/* tool rail */}
+        <aside className="flex w-[84px] flex-col items-center gap-1 py-4" style={{ background: "var(--color-rail)", borderRight: "1px solid var(--color-border-theme)" }}>
+          {tools.map(({ id, label, icon: Icon }) => (
+            <button
+              key={id} onClick={() => setTool(id)}
+              className="flex w-16 flex-col items-center gap-1 rounded-xl px-1 py-2 transition-colors"
+              style={tool === id ? { background: "var(--color-accent-soft)" } : {}}
             >
-              <span>📝</span> Transcript
-            </h2>
+              <Icon size={17} style={{ color: tool === id ? "var(--color-accent)" : "var(--color-text-secondary)" }} />
+              <span className="text-[10px]" style={{ color: tool === id ? "var(--color-text-primary)" : "var(--color-text-secondary)" }}>{label}</span>
+            </button>
+          ))}
+        </aside>
 
-            {/* Transcript tabs */}
-            {(project?.transcripts?.length ?? 0) > 1 && (
-              <div
-                style={{
-                  display: "flex",
-                  gap: "8px",
-                  marginBottom: "16px",
-                  flexWrap: "wrap",
-                }}
-              >
-                {project!.transcripts.map((t) => (
+        {/* tool panel */}
+        <section className="flex w-72 flex-col overflow-y-auto px-4 py-4" style={{ background: "var(--color-panel)", borderRight: "1px solid var(--color-border-theme)" }}>
+          {tool === "captions" && (
+            <>
+              <PanelTitle title="Captions" sub={`${LANGS[lang] || lang} · click a line to edit`} />
+              <div className="mb-3 flex flex-wrap gap-1.5">
+                {allLangs.map((l) => (
                   <button
-                    key={t.id}
-                    onClick={() => setSelectedTranscript(t)}
-                    className={
-                      selectedTranscript?.id === t.id
-                        ? "btn-primary"
-                        : "btn-secondary"
-                    }
-                    style={{ padding: "6px 14px", fontSize: "0.8rem" }}
+                    key={l} onClick={() => setLang(l)}
+                    className="rounded-md px-2 py-1 text-[11px] font-medium transition-colors"
+                    style={lang === l ? { background: "var(--color-accent)", color: "#FFF" } : { background: "var(--color-input-bg)", color: "var(--color-text-secondary)" }}
                   >
-                    {t.language.toUpperCase()} ({t.source})
+                    {LANGS[l] || l}
                   </button>
                 ))}
               </div>
-            )}
+              <div className="flex-1 space-y-2 pb-10">
+                {captions.map((c, i) => (
+                  <div
+                    key={i} onClick={() => { setSelectedId(i); seek(c.start); }}
+                    className="cursor-pointer rounded-xl p-2.5 transition-colors"
+                    style={{
+                      background: "var(--color-card)",
+                      border: `1px solid ${currentCaption === c ? "var(--color-accent)" : selectedId === i ? "var(--color-text-muted)" : "var(--color-border-theme)"}`,
+                      borderLeft: currentCaption === c ? `3px solid var(--color-accent)` : undefined,
+                    }}
+                  >
+                    <div className="mb-1 flex items-center justify-between">
+                      <span className="text-[10px]" style={{ color: currentCaption === c ? "var(--color-accent)" : "var(--color-text-muted)" }}>
+                        {fmt(c.start)} → {fmt(c.end)} {currentCaption === c && "· now playing"}
+                      </span>
+                      <Trash2 size={12} style={{ color: "var(--color-text-muted)" }} onClick={(e) => { e.stopPropagation(); removeCaption(i); }} />
+                    </div>
+                    {selectedId === i ? (
+                      <input
+                        autoFocus value={c.text}
+                        onChange={(e) => setCaptionText(i, e.target.value)}
+                        className="w-full rounded-md px-2 py-1 text-xs outline-none"
+                        style={{ background: "var(--color-input-bg)", color: "var(--color-text-primary)", border: "1px solid var(--color-border-theme)" }}
+                      />
+                    ) : (
+                      <p className="text-xs leading-relaxed">{c.text || <em style={{ color: "var(--color-text-muted)" }}>Empty</em>}</p>
+                    )}
+                  </div>
+                ))}
+                {captions.length === 0 && (
+                  <p className="pt-8 text-center text-xs" style={{ color: "var(--color-text-muted)" }}>No captions yet.</p>
+                )}
+                <button onClick={addCaption} className="mt-3 flex w-full items-center justify-center gap-1.5 rounded-xl border border-dashed py-2 text-xs transition-colors hover:bg-black/5" style={{ borderColor: "var(--color-text-muted)", color: "var(--color-text-secondary)" }}>
+                  <Plus size={13} /> Add caption
+                </button>
+              </div>
+            </>
+          )}
 
-            {/* Interactive Editor */}
-            {selectedTranscript && (
-              <TranscriptEditor
-                initialSegments={selectedTranscript.segments}
-                onSave={handleSaveTranscript}
+          {tool === "languages" && (
+            <>
+              <PanelTitle title="Languages" sub="One video, many audiences" />
+              <div className="space-y-2">
+                {project.transcripts.map((t) => (
+                  <div key={t.id} className="flex items-center justify-between rounded-xl p-3" style={{ background: "var(--color-card)", border: "1px solid var(--color-border-theme)" }}>
+                    <div>
+                      <p className="text-xs font-medium">{LANGS[t.language] || t.language}</p>
+                      <p className="text-[10px]" style={{ color: t.source === "asr" ? "var(--color-green-theme)" : "var(--color-amber-theme)" }}>
+                        {t.source === "asr" ? "Source · reviewed" : "Translated · review before export"}
+                      </p>
+                    </div>
+                    <button onClick={() => { setLang(t.language); setTool("captions"); }} className="text-[11px] transition-opacity hover:opacity-70" style={{ color: "var(--color-accent)" }}>Edit</button>
+                  </div>
+                ))}
+              </div>
+              <p className="mb-2 mt-4 text-[11px]" style={{ color: "var(--color-text-secondary)" }}>Add a language</p>
+              <div className="flex flex-wrap gap-1.5">
+                {Object.entries(LANGS).filter(([c]) => !allLangs.includes(c)).map(([c, name]) => (
+                  <button key={c} onClick={() => addLanguage(c)} className="rounded-md px-2.5 py-1.5 text-[11px] transition-colors hover:bg-black/5" style={{ background: "var(--color-input-bg)", color: "var(--color-text-secondary)", border: "1px solid var(--color-border-theme)" }}>
+                    + {name}
+                  </button>
+                ))}
+              </div>
+            </>
+          )}
+
+          {tool === "style" && (
+            <>
+              <PanelTitle title="Style" sub="Applies live to the preview" />
+              <div className="grid grid-cols-2 gap-2">
+                {PRESETS.map((p) => (
+                  <button
+                    key={p.id} 
+                    onClick={async () => {
+                      try {
+                        await saveStyle(projectId!, { font: p.name, color: "#FFF", position: "bottom", animation_type: "none" });
+                        loadProject(); // refresh style
+                      } catch (err) { console.error(err); }
+                    }}
+                    className="rounded-xl p-3 text-center transition-transform hover:scale-105"
+                    style={{ background: "var(--color-card)", border: `2px solid ${activePreset?.id === p.id ? "var(--color-accent)" : "var(--color-border-theme)"}` }}
+                  >
+                    <span className="rounded px-1.5 py-0.5 text-[11px] text-white" style={p.css}>సరళ</span>
+                    <p className="mt-2 text-[11px]" style={{ color: "var(--color-text-secondary)" }}>{p.name}</p>
+                  </button>
+                ))}
+              </div>
+            </>
+          )}
+        </section>
+
+        {/* preview column — always dark theme background for video readability */}
+        <section className="flex min-w-0 flex-1 flex-col p-4" style={{ background: "var(--color-bg-dark-fixed, #0D0D0D)" }}>
+          <div
+            className="relative mx-auto flex aspect-video w-full max-w-3xl flex-1 items-center justify-center overflow-hidden rounded-lg"
+            style={{ background: "linear-gradient(135deg, #8D80C7 0%, #7469B6 60%, #665BA6 100%)", maxHeight: "100%" }}
+          >
+            {project.video_download_url ? (
+              <video 
+                ref={videoRef}
+                src={project.video_download_url} 
+                className="absolute inset-0 w-full h-full object-contain"
+                onTimeUpdate={handleTimeUpdate}
+                onClick={togglePlay}
+                playsInline
               />
-            )}
-
-            {/* Karaoke Player (shown when word-level data exists) */}
-            {selectedTranscript && selectedTranscript.segments.some((s) => s.words && s.words.length > 0) && (
-              <div style={{ marginTop: "24px" }}>
-                <KaraokePlayer
-                  segments={selectedTranscript.segments}
-                  showDemoControls={true}
-                />
-              </div>
-            )}
-
-            {/* Karaoke hint when no word data */}
-            {selectedTranscript && !selectedTranscript.segments.some((s) => s.words && s.words.length > 0) && selectedPreset?.animation_type === "karaoke" && (
-              <div
-                style={{
-                  marginTop: "16px",
-                  padding: "12px 16px",
-                  background: "rgba(99,102,241,0.07)",
-                  border: "1px solid rgba(99,102,241,0.2)",
-                  borderRadius: "var(--radius-md)",
-                  fontSize: "0.85rem",
-                  color: "var(--color-text-secondary)",
-                }}
+            ) : null}
+            
+            {!playing && (
+              <button
+                onClick={togglePlay}
+                className="flex h-14 w-14 items-center justify-center rounded-full transition-transform hover:scale-105 z-10"
+                style={{ background: "rgba(0,0,0,0.5)", backdropFilter: "blur(4px)" }}
               >
-                💡 You selected the <strong>Karaoke</strong> preset. To enable word-by-word highlighting, re-transcribe with <em>Karaoke mode</em> checked in the upload section.
+                <Play size={22} fill="white" color="white" />
+              </button>
+            )}
+            
+            {currentCaption && (
+              <div className="absolute bottom-10 left-0 right-0 flex justify-center px-6 pointer-events-none z-10">
+                <span className="rounded-md px-3 py-1.5 text-white" style={{...activePreset.css, textAlign: "center"}}>
+                  {currentCaption.text}
+                </span>
               </div>
             )}
-          </section>
-        )}
+          </div>
 
-        {/* Section: Translate */}
-        {selectedTranscript && (
-          <section id="section-translate" style={{ marginBottom: "48px" }}>
-            <h2
-              style={{
-                fontSize: "1.3rem",
-                fontWeight: 700,
-                marginBottom: "20px",
-                display: "flex",
-                alignItems: "center",
-                gap: "10px",
+          {/* timeline strip */}
+          <div className="mx-auto mt-3 w-full max-w-3xl">
+            <div className="mb-1 flex justify-between text-[10px]" style={{ color: "#8A8A8A" }}>
+              <span>{fmt(time)}</span><span>{fmt(dur)}</span>
+            </div>
+            <div
+              className="relative h-12 cursor-pointer overflow-hidden rounded-lg"
+              style={{ background: "var(--color-track-fixed, #1A1A1A)" }}
+              onClick={(e) => {
+                const r = e.currentTarget.getBoundingClientRect();
+                seek(((e.clientX - r.left) / r.width) * dur);
               }}
             >
-              <span>🌐</span> Translate
-            </h2>
-            <LanguageSelector
-              sourceLanguage={sourceLanguage}
-              targetLanguage={targetLanguage}
-              onSourceChange={setSourceLanguage}
-              onTargetChange={setTargetLanguage}
-              onTranslate={handleTranslate}
-              isTranslating={isTranslating}
-            />
-          </section>
-        )}
-
-        {/* Section: Style */}
-        {selectedTranscript && (
-          <section id="section-style" style={{ marginBottom: "48px" }}>
-            <h2
-              style={{
-                fontSize: "1.3rem",
-                fontWeight: 700,
-                marginBottom: "20px",
-                display: "flex",
-                alignItems: "center",
-                gap: "10px",
-              }}
-            >
-              <span>🎨</span> Style
-            </h2>
-            <SubtitleStylePicker
-              selectedPreset={selectedPreset}
-              onSelectPreset={handleStyleChange}
-            />
-          </section>
-        )}
-
-        {/* Section: Export */}
-        {selectedTranscript && (
-          <section id="section-export" style={{ marginBottom: "48px" }}>
-            <h2
-              style={{
-                fontSize: "1.3rem",
-                fontWeight: 700,
-                marginBottom: "20px",
-                display: "flex",
-                alignItems: "center",
-                gap: "10px",
-              }}
-            >
-              <span>📥</span> Export
-            </h2>
-            <ExportPanel
-              onExport={handleExport}
-              isExporting={isExporting}
-              downloads={
-                project?.exports
-                  ?.filter((e) => e.url)
-                  .map((e) => ({
-                    format: e.format,
-                    url: e.url!,
-                    created_at: e.created_at,
-                  })) || []
-              }
-            />
-          </section>
-        )}
+              {captions.map((c, i) => (
+                <div
+                  key={i}
+                  onClick={(e) => { e.stopPropagation(); setSelectedId(i); seek(c.start); }}
+                  className="absolute top-2 flex h-8 items-center justify-center overflow-hidden rounded-md px-1 transition-colors hover:brightness-110"
+                  style={{
+                    left: `${(c.start / dur) * 100}%`, width: `${((c.end - c.start) / dur) * 100}%`,
+                    background: currentCaption === c ? "var(--color-accent)" : "rgba(116,105,182,0.45)",
+                  }}
+                >
+                  <span className="truncate text-[9px] text-white">{c.text || "…"}</span>
+                </div>
+              ))}
+              <div className="pointer-events-none absolute bottom-0 top-0 w-px" style={{ left: `${(time / dur) * 100}%`, background: "#E5484D" }}>
+                <div className="absolute -left-[5px] top-0 h-3 w-[11px] rounded-b-md" style={{ background: "#E5484D" }} />
+              </div>
+            </div>
+          </div>
+        </section>
       </div>
+
+      {/* toast */}
+      {toast && (
+        <div className="absolute bottom-5 left-1/2 -translate-x-1/2 rounded-xl px-4 py-2.5 text-xs text-white shadow-xl animate-slide-up" style={{ background: "#2A2A3D", border: "1px solid var(--color-accent)", zIndex: 100 }}>
+          {toast}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function PanelTitle({ title, sub }: { title: string, sub: string }) {
+  return (
+    <div className="mb-4">
+      <h2 className="text-base font-semibold" style={{ color: "var(--color-text-primary)" }}>{title}</h2>
+      <div className="mb-1 mt-1 h-0.5 w-8 rounded-full" style={{ background: "var(--color-accent)" }} />
+      <p className="text-[11px]" style={{ color: "var(--color-text-secondary)" }}>{sub}</p>
     </div>
   );
 }
 
 export default function ProjectPage() {
   return (
-    <Suspense fallback={<div className="p-8 text-center">Loading project...</div>}>
-      <ProjectEditor />
+    <Suspense fallback={<div className="flex-1 flex items-center justify-center h-screen" style={{ background: "var(--color-bg-theme)" }}><p style={{color: "var(--color-text-secondary)"}}>Loading editor...</p></div>}>
+      <EditorContent />
     </Suspense>
   );
 }

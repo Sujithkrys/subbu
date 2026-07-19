@@ -1,126 +1,72 @@
 "use client";
 
-import { useRouter, usePathname } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
+import { LayoutDashboard, Clapperboard, Settings as SettingsIcon } from "lucide-react";
+import { useEffect, useState } from "react";
+import { createClient } from "@/lib/supabaseClient";
 
-interface SidebarProps {
-  projectId: string;
-  projectTitle?: string;
-}
-
-const navItems = [
-  { label: "Upload", icon: "📤", section: "upload" },
-  { label: "Transcript", icon: "📝", section: "transcript" },
-  { label: "Translate", icon: "🌐", section: "translate" },
-  { label: "Style", icon: "🎨", section: "style" },
-  { label: "Preview", icon: "🖥️", section: "preview" },
-  { label: "Export", icon: "📥", section: "export" },
-];
-
-export default function Sidebar({ projectId, projectTitle }: SidebarProps) {
+export default function Sidebar() {
+  const pathname = usePathname();
   const router = useRouter();
+  const [mostRecentProjectId, setMostRecentProjectId] = useState<string | null>(null);
+  
+  useEffect(() => {
+    // Fetch most recent project for the Editor link
+    async function fetchRecent() {
+      const sb = createClient();
+      const { data: { user } } = await sb.auth.getUser();
+      if (!user) return;
+      const { data } = await sb.from("projects").select("id").eq("user_id", user.id).order("created_at", { ascending: false }).limit(1);
+      if (data && data.length > 0) {
+        setMostRecentProjectId(data[0].id);
+      }
+    }
+    fetchRecent();
+  }, [pathname]); // re-fetch on navigation
 
-  const scrollToSection = (section: string) => {
-    const el = document.getElementById(`section-${section}`);
-    if (el) {
-      el.scrollIntoView({ behavior: "smooth", block: "start" });
+  // Hide sidebar on editor pages, login, signup, home
+  const hideSidebar = pathname?.startsWith("/project/") || pathname === "/" || pathname === "/login" || pathname === "/signup";
+  if (hideSidebar) return null;
+
+  const currentMenu = pathname?.startsWith("/settings") ? "settings" : "dashboard";
+
+  const handleEditorClick = () => {
+    if (mostRecentProjectId) {
+      router.push(`/project?id=${mostRecentProjectId}`);
+    } else {
+      router.push("/dashboard");
     }
   };
 
+  const items = [
+    { id: "dashboard", label: "Dashboard", icon: LayoutDashboard, go: () => router.push("/dashboard") },
+    { id: "editor", label: "Editor", icon: Clapperboard, go: handleEditorClick },
+    { id: "settings", label: "Settings", icon: SettingsIcon, go: () => router.push("/settings") },
+  ];
+
   return (
-    <aside
-      className="glass"
-      style={{
-        width: "220px",
-        minHeight: "calc(100vh - 64px)",
-        padding: "24px 12px",
-        borderRight: "1px solid var(--color-border)",
-        position: "sticky",
-        top: "64px",
-        flexShrink: 0,
-      }}
-    >
-      {/* Back to dashboard */}
-      <button
-        onClick={() => router.push("/dashboard")}
-        style={{
-          display: "flex",
-          alignItems: "center",
-          gap: "8px",
-          background: "none",
-          border: "none",
-          color: "var(--color-text-muted)",
-          cursor: "pointer",
-          padding: "8px 12px",
-          borderRadius: "var(--radius-sm)",
-          fontSize: "0.85rem",
-          width: "100%",
-          marginBottom: "8px",
-          transition: "color 0.2s",
-        }}
-        onMouseEnter={(e) => (e.currentTarget.style.color = "var(--color-text-primary)")}
-        onMouseLeave={(e) => (e.currentTarget.style.color = "var(--color-text-muted)")}
-      >
-        ← Dashboard
-      </button>
-
-      {/* Project title */}
-      <div
-        style={{
-          padding: "8px 12px",
-          marginBottom: "16px",
-          borderBottom: "1px solid var(--color-border)",
-          paddingBottom: "16px",
-        }}
-      >
-        <p
-          style={{
-            fontSize: "0.95rem",
-            fontWeight: 600,
-            overflow: "hidden",
-            textOverflow: "ellipsis",
-            whiteSpace: "nowrap",
-          }}
-        >
-          {projectTitle || "Untitled Project"}
-        </p>
+    <aside className="flex w-56 flex-col px-4 py-6" style={{ background: "var(--color-rail)", borderRight: "1px solid var(--color-border-theme)" }}>
+      <div className="mb-8 flex items-center gap-2.5 px-2">
+        <div className="flex h-9 w-9 items-center justify-center rounded-xl text-base font-semibold text-white" style={{ background: "var(--color-accent)" }}>సు</div>
+        <span className="text-lg font-semibold" style={{ color: "var(--color-text-primary)" }}>Subbu</span>
       </div>
-
-      {/* Navigation */}
-      <nav style={{ display: "flex", flexDirection: "column", gap: "2px" }}>
-        {navItems.map((item) => (
+      <nav className="space-y-1">
+        {items.map(({ id, label, icon: Icon, go }) => (
           <button
-            key={item.section}
-            onClick={() => scrollToSection(item.section)}
-            style={{
-              display: "flex",
-              alignItems: "center",
-              gap: "10px",
-              padding: "10px 12px",
-              borderRadius: "var(--radius-sm)",
-              background: "none",
-              border: "none",
-              color: "var(--color-text-secondary)",
-              cursor: "pointer",
-              fontSize: "0.9rem",
-              fontWeight: 500,
-              textAlign: "left",
-              width: "100%",
-              transition: "all 0.2s ease",
-            }}
-            onMouseEnter={(e) => {
-              e.currentTarget.style.background = "var(--color-bg-hover)";
-              e.currentTarget.style.color = "var(--color-text-primary)";
-            }}
-            onMouseLeave={(e) => {
-              e.currentTarget.style.background = "none";
-              e.currentTarget.style.color = "var(--color-text-secondary)";
-            }}
+            key={id}
+            onClick={go}
+            className="flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-sm transition-colors"
+            style={currentMenu === id ? { background: "var(--color-accent)", color: "#FFF" } : { color: "var(--color-text-secondary)" }}
           >
-            <span>{item.icon}</span>
-            {item.label}
+            <Icon size={17} /> {label}
           </button>
         ))}
       </nav>
+      <div className="mt-auto rounded-2xl p-4" style={{ background: "var(--color-accent-soft)" }}>
+        <p className="mb-1 text-sm font-medium" style={{ color: "var(--color-text-primary)" }}>Creator plan</p>
+        <p className="mb-3 text-xs leading-relaxed" style={{ color: "var(--color-text-secondary)" }}>Higher caption quotas — coming soon.</p>
+        <button className="w-full rounded-lg py-2 text-xs font-medium text-white transition-transform hover:scale-[1.02]" style={{ background: "var(--color-accent)" }}>Join waitlist</button>
+      </div>
     </aside>
   );
 }

@@ -60,6 +60,7 @@ class TranscriptResponse(BaseModel):
     language: str
     segments: list[Segment]
     source: str  # 'asr' or 'translated'
+    review_state: str = "needs_review"
     created_at: datetime
 
 
@@ -86,6 +87,7 @@ class StyleRequest(BaseModel):
         default=None,
         description="Animation: fade, slide, pop, typewriter, none"
     )
+    preset: Optional[str] = Field(default="minimal", description="Style preset identifier")
 
 
 class StyleResponse(BaseModel):
@@ -95,6 +97,7 @@ class StyleResponse(BaseModel):
     color: str
     position: str
     animation_type: Optional[str]
+    preset: Optional[str] = "minimal"
     created_at: datetime
 
 
@@ -141,3 +144,13 @@ class ProjectStatusResponse(BaseModel):
     jobs: list[JobResponse]
     transcripts: list[TranscriptResponse] = []
     exports: list[ExportResponse] = []
+
+
+# ── User Settings ────────────────────────────────────────────────────────────
+
+class UserSettingsRequest(BaseModel):
+    theme: str = Field(default="dark", description="UI theme preference")
+
+class UserSettingsResponse(BaseModel):
+    user_id: UUID
+    theme: str

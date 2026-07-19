@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import "./globals.css";
-import Navbar from "@/components/Navbar";
+import Sidebar from "@/components/Sidebar";
+import ThemeProvider from "@/components/ThemeProvider";
 
 export const metadata: Metadata = {
   title: "SubGen — AI Subtitle Generator",
@@ -37,14 +38,14 @@ export default function RootLayout({
         />
       </head>
       <body>
-        <Navbar />
-        <main
-          style={{
-            minHeight: "calc(100vh - 64px)",
-          }}
-        >
-          {children}
-        </main>
+        <ThemeProvider>
+          <div className="flex h-screen font-sans">
+            <Sidebar />
+            <main className="flex-1 flex flex-col overflow-hidden">
+              {children}
+            </main>
+          </div>
+        </ThemeProvider>
       </body>
     </html>
   );

@@ -161,12 +161,18 @@ def get_transcript(transcript_id: str) -> dict:
     return result.data
 
 
-def update_transcript(transcript_id: str, segments: list[dict]) -> dict:
-    """Update a transcript's segments."""
+def update_transcript(transcript_id: str, segments: list[dict] = None, review_state: str = None) -> dict:
+    """Update a transcript's segments or review state."""
     sb = get_supabase()
+    update_data = {}
+    if segments is not None:
+        update_data["segments"] = segments
+    if review_state is not None:
+        update_data["review_state"] = review_state
+        
     result = (
         sb.table("transcripts")
-        .update({"segments": segments})
+        .update(update_data)
         .eq("id", transcript_id)
         .execute()
     )
@@ -175,7 +181,7 @@ def update_transcript(transcript_id: str, segments: list[dict]) -> dict:
 
 # ── Style helpers ────────────────────────────────────────────────────────────
 
-def save_style(project_id: str, font: str, color: str, position: str, animation_type: str = None) -> dict:
+def save_style(project_id: str, font: str, color: str, position: str, animation_type: str = None, preset: str = "minimal") -> dict:
     """Save or update subtitle style for a project."""
     sb = get_supabase()
     # Upsert: delete existing style for this project, then insert
@@ -185,7 +191,8 @@ def save_style(project_id: str, font: str, color: str, position: str, animation_
         "font": font,
         "color": color,
         "position": position,
-        "animation_type": animation_type
+        "animation_type": animation_type,
+        "preset": preset
     }).execute()
     return result.data[0]
 
@@ -339,3 +346,28 @@ def delete_project(project_id: str) -> bool:
     sb = get_supabase()
     sb.table("projects").delete().eq("id", project_id).execute()
     return True
+
+
+# ── User Settings helpers ────────────────────────────────────────────────────
+
+def get_user_settings(user_id: str) -> dict:
+    """Get user settings (e.g. theme)."""
+    sb = get_supabase()
+    result = sb.table("user_settings").select("*").eq("user_id", user_id).execute()
+    if result.data:
+        return result.data[0]
+    # Return defaults if no record exists
+    return {"user_id": user_id, "theme": "dark"}
+
+
+def update_user_settings(user_id: str, theme: str) -> dict:
+    """Update or create user settings."""
+    sb = get_supabase()
+    # Check if exists
+    result = sb.table("user_settings").select("*").eq("user_id", user_id).execute()
+    if result.data:
+        res = sb.table("user_settings").update({"theme": theme}).eq("user_id", user_id).execute()
+        return res.data[0]
+    else:
+        res = sb.table("user_settings").insert({"user_id": user_id, "theme": theme}).execute()
+        return res.data[0]
