@@ -3,7 +3,6 @@
 import { usePathname, useRouter } from "next/navigation";
 import { LayoutDashboard, Clapperboard, Settings as SettingsIcon } from "lucide-react";
 import { useEffect, useState } from "react";
-import { createClient } from "@/lib/supabaseClient";
 
 export default function Sidebar() {
   const pathname = usePathname();
@@ -13,12 +12,15 @@ export default function Sidebar() {
   useEffect(() => {
     // Fetch most recent project for the Editor link
     async function fetchRecent() {
-      const sb = createClient();
-      const { data: { user } } = await sb.auth.getUser();
-      if (!user) return;
-      const { data } = await sb.from("projects").select("id").eq("user_id", user.id).order("created_at", { ascending: false }).limit(1);
-      if (data && data.length > 0) {
-        setMostRecentProjectId(data[0].id);
+      try {
+        const { listProjects } = await import("@/lib/api");
+        const res = await listProjects();
+        if (res.projects && res.projects.length > 0) {
+          // Assuming projects are sorted by created_at descending by default or just take the first one
+          setMostRecentProjectId(res.projects[0].id);
+        }
+      } catch (err) {
+        console.error("Failed to fetch recent project", err);
       }
     }
     fetchRecent();
