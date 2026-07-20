@@ -21,6 +21,7 @@ export default function SettingsLayout({ children }: { children: React.ReactNode
 
   const tabs = [
     { label: "Account", href: "/settings" },
+    { label: "Voice Samples", href: "/settings/voice-samples" },
     { label: "Usage", href: "/settings/usage" },
   ];
 

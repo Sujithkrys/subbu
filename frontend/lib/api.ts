@@ -36,7 +36,7 @@ async function getAuthHeaders(): Promise<Record<string, string>> {
   };
 }
 
-async function apiFetch<T>(
+export async function apiFetch<T>(
   path: string,
   options: RequestInit = {}
 ): Promise<T> {
@@ -254,10 +254,10 @@ export async function uploadVoiceSample(projectId: string, file: File): Promise<
   });
 }
 
-export async function startCloning(projectId: string, lang: string): Promise<any> {
+export async function startCloning(projectId: string, lang: string, voiceSampleId: string): Promise<any> {
   return apiFetch<any>(`/projects/${projectId}/clone/${lang}`, {
     method: "POST",
-    body: JSON.stringify({ consent_given: true }),
+    body: JSON.stringify({ consent_given: true, voice_sample_id: voiceSampleId }),
   });
 }
 

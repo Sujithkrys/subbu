@@ -13,36 +13,10 @@ from services.storage_service import generate_presigned_url, upload_file_to_r2
 router = APIRouter(prefix="/projects", tags=["cloning"])
 
 class CloneStartRequest(BaseModel):
+    voice_sample_id: str
     consent_given: bool
-
-# We'll use this sample audio url as a fallback mock if the API key is missing
-MOCK_AUDIO_URL = "https://www.soundhelix.com/examples/mp3/SoundHelix-Song-1.mp3"
-
-@router.post("/{project_id}/voice-sample")
-async def upload_voice_sample(project_id: str, file: UploadFile = File(...), user: dict = Depends(get_current_user)):
-    """Upload a voice sample and save it to the user's settings."""
-    try:
-        content = await file.read()
-        file_ext = file.filename.split('.')[-1] if file.filename and '.' in file.filename else 'webm'
-        object_name = f"voice_samples/{user['id']}/{uuid.uuid4()}.{file_ext}"
-        
-        # Upload to R2
-        upload_file_to_r2(content, object_name, file.content_type or "audio/webm")
-        
-        # We need a public or presigned URL to access it later. For now we just store the key or a generated presigned url.
-        url = f"{os.getenv('R2_ENDPOINT')}/{os.getenv('R2_BUCKET_NAME')}/{object_name}"
-        
-        # Update user settings
-        sb = get_supabase()
-        sb.table("user_settings").update({"voice_sample_url": url}).eq("user_id", user["id"]).execute()
-        
-        return {"status": "success", "url": url}
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
-
-
 @router.post("/{project_id}/clone/{lang}")
-async def start_voice_clone(project_id: str, lang: string, req: CloneStartRequest, background_tasks: BackgroundTasks, user: dict = Depends(get_current_user)):
+async def start_voice_clone(project_id: str, lang: str, req: CloneStartRequest, background_tasks: BackgroundTasks, user: dict = Depends(get_current_user)):
     """Start the voice cloning process."""
     if not req.consent_given:
         raise HTTPException(status_code=400, detail="Consent is required to clone voice")
@@ -60,12 +34,14 @@ async def start_voice_clone(project_id: str, lang: string, req: CloneStartReques
     if clone_res.data:
         clone_id = clone_res.data[0]["id"]
         sb.table("voice_clones").update({
+            "voice_sample_id": req.voice_sample_id,
             "status": "cloning",
             "consent_given_at": "now()"
         }).eq("id", clone_id).execute()
     else:
         new_clone = sb.table("voice_clones").insert({
             "project_id": project_id,
+            "voice_sample_id": req.voice_sample_id,
             "language": lang,
             "status": "cloning",
             "consent_given_at": "now()"
@@ -73,15 +49,14 @@ async def start_voice_clone(project_id: str, lang: string, req: CloneStartReques
         clone_id = new_clone.data[0]["id"]
         
     # Start background task to process
-    background_tasks.add_task(process_voice_clone, clone_id, project_id, lang, user["id"])
+    background_tasks.add_task(process_voice_clone, clone_id, project_id, lang, user["id"], req.voice_sample_id)
     
     return {"status": "cloning", "clone_id": clone_id}
 
 
-async def process_voice_clone(clone_id: str, project_id: str, lang: str, user_id: str):
+async def process_voice_clone(clone_id: str, project_id: str, lang: str, user_id: str, voice_sample_id: str):
     """Background task to interact with Sarvam API"""
     sb = get_supabase()
-    api_key = os.getenv("SARVAM_API_KEY", "")
     
     LANG_MAP = {
         "hi": "hi-IN", "te": "te-IN", "ta": "ta-IN", "ml": "ml-IN", 
@@ -91,14 +66,14 @@ async def process_voice_clone(clone_id: str, project_id: str, lang: str, user_id
     }
     
     try:
-        import base64
         import uuid
-        from sarvamai import SarvamAI
+        import httpx
+        from io import BytesIO
+        from pydub import AudioSegment
+        from services.sarvam_service import create_voice, generate_dubbed_segment
         from services.storage_service import upload_file_to_r2
         
-        if not api_key or api_key == "your_sarvam_api_key_here":
-            raise Exception("SARVAM_API_KEY is not set or is using the default placeholder.")
-            
+        # 1. Fetch transcript segments
         transcript_res = sb.table("transcripts").select("segments").eq("project_id", project_id).eq("language", lang).execute()
         if not transcript_res.data:
             transcript_res = sb.table("transcripts").select("segments").eq("project_id", project_id).order("created_at", desc=False).execute()
@@ -109,36 +84,79 @@ async def process_voice_clone(clone_id: str, project_id: str, lang: str, user_id
         if not segments:
             raise Exception("Transcript has no segments.")
             
-        full_text = " ".join([s.get("text", "") for s in segments])
-        if len(full_text) > 2400:
-            full_text = full_text[:2400] + "..." # Truncate due to TTS length limits
+        # 2. Fetch voice sample URL
+        sample_res = sb.table("voice_samples").select("storage_url").eq("id", voice_sample_id).execute()
+        if not sample_res.data:
+            raise Exception("Voice sample not found.")
             
+        sample_url = sample_res.data[0]["storage_url"]
+        
+        # 3. Download sample and create voice
+        async with httpx.AsyncClient() as client:
+            resp = await client.get(sample_url)
+            resp.raise_for_status()
+            sample_bytes = resp.content
+            
+        # create_voice expects a file path or file-like object in some SDKs, but the prompt says 
+        # `create_voice(file=sample_file, consent_given=True)`. We'll write it to a temp file.
+        temp_sample_path = f"/tmp/{uuid.uuid4()}.wav"
+        os.makedirs("/tmp", exist_ok=True)
+        with open(temp_sample_path, "wb") as f:
+            f.write(sample_bytes)
+            
+        # Get voice ID
+        try:
+            sarvam_voice_id = create_voice(temp_sample_path, consent_given=True)
+        finally:
+            if os.path.exists(temp_sample_path):
+                os.remove(temp_sample_path)
+        
+        # 4. Generate audio per segment and stitch
         sarvam_lang = LANG_MAP.get(lang, "hi-IN")
-        client = SarvamAI(api_subscription_key=api_key)
         
-        response = client.text_to_speech.convert(
-            text=full_text,
-            target_language_code=sarvam_lang,
-            speaker="meera", # Fallback default standard speaker if voice cloning isn't explicitly configured in SDK
-            model="bulbul:v3",
-            pace=1.0
-        )
+        # Find total duration needed
+        last_segment_end = max([s.get("end", 0.0) for s in segments])
+        # Add 5 seconds buffer to the end
+        total_duration_ms = int((last_segment_end + 5.0) * 1000)
         
-        audio_data = base64.b64decode(response.audios[0])
+        final_audio = AudioSegment.silent(duration=total_duration_ms)
+        
+        for seg in segments:
+            text = seg.get("text", "").strip()
+            if not text:
+                continue
+                
+            start_ms = int(seg.get("start", 0.0) * 1000)
+            
+            # Generate audio bytes
+            audio_bytes = generate_dubbed_segment(text, sarvam_lang, sarvam_voice_id)
+            
+            # Load into pydub
+            seg_audio = AudioSegment.from_file(BytesIO(audio_bytes))
+            
+            # Overlay at the correct timestamp
+            final_audio = final_audio.overlay(seg_audio, position=start_ms)
+            
+        # 5. Export stitched audio and upload
+        out_buf = BytesIO()
+        final_audio.export(out_buf, format="wav")
+        out_bytes = out_buf.getvalue()
+        
         object_name = f"clones/{project_id}/{lang}_{uuid.uuid4()}.wav"
-        upload_file_to_r2(audio_data, object_name, "audio/wav")
-        
+        upload_file_to_r2(out_bytes, object_name, "audio/wav")
         url = f"{os.getenv('R2_ENDPOINT')}/{os.getenv('R2_BUCKET_NAME')}/{object_name}"
+        
         sb.table("voice_clones").update({
             "status": "ready",
             "ready_audio_url": url,
-            "sarvam_voice_id": "bulbul_v3"
+            "sarvam_voice_id": sarvam_voice_id
         }).eq("id", clone_id).execute()
 
     except Exception as e:
         print(f"Cloning failed: {e}")
         sb.table("voice_clones").update({
-            "status": "failed"
+            "status": "failed",
+            "error_message": str(e)
         }).eq("id", clone_id).execute()
 
 
