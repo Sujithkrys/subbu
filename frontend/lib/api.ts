@@ -41,6 +41,9 @@ async function apiFetch<T>(
   options: RequestInit = {}
 ): Promise<T> {
   const headers = await getAuthHeaders();
+  if (options.body instanceof FormData) {
+    delete headers["Content-Type"];
+  }
   const response = await fetch(`${API_URL}${path}`, {
     ...options,
     headers: {
@@ -238,4 +241,30 @@ export async function updateUserSettings(theme: string): Promise<{ user_id: stri
     method: "PATCH",
     body: JSON.stringify({ theme }),
   });
+}
+
+// ── Voice Cloning APIs ──────────────────────────────────────────────────────
+
+export async function uploadVoiceSample(projectId: string, file: File): Promise<any> {
+  const formData = new FormData();
+  formData.append("file", file);
+  return apiFetch<any>(`/projects/${projectId}/voice-sample`, {
+    method: "POST",
+    body: formData,
+  });
+}
+
+export async function startCloning(projectId: string, lang: string): Promise<any> {
+  return apiFetch<any>(`/projects/${projectId}/clone/${lang}`, {
+    method: "POST",
+    body: JSON.stringify({ consent_given: true }),
+  });
+}
+
+export async function getCloneStatus(projectId: string, lang: string): Promise<any> {
+  return apiFetch<any>(`/projects/${projectId}/clone/${lang}/status`);
+}
+
+export async function getClones(projectId: string): Promise<any[]> {
+  return apiFetch<any[]>(`/projects/${projectId}/clones`);
 }

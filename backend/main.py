@@ -10,7 +10,7 @@ from dotenv import load_dotenv
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from routers import projects, transcribe, translate, style, export, status
+from routers import projects, transcribe, translate, cloning, style, export, status
 from workers import transcribe_worker, translate_worker, render_worker
 
 load_dotenv()
@@ -45,6 +45,7 @@ app.add_middleware(
 app.include_router(projects.router, prefix="/projects", tags=["Projects"])
 app.include_router(transcribe.router, prefix="/projects", tags=["Transcription"])
 app.include_router(translate.router, prefix="/projects", tags=["Translation"])
+app.include_router(cloning.router, prefix="/projects", tags=["Cloning"])
 app.include_router(style.router, prefix="/projects", tags=["Styling"])
 app.include_router(export.router, prefix="/projects", tags=["Export"])
 app.include_router(status.router, prefix="/projects", tags=["Status"])

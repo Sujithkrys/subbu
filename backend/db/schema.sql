@@ -96,6 +96,66 @@ create policy "Users can manage own styles"
   );
 
 
+-- ── User Settings ───────────────────────────────────────────────────────────
+-- (Assuming user_settings table exists, adding it here if it doesn't)
+create table if not exists user_settings (
+  user_id uuid primary key references auth.users,
+  theme text default 'dark',
+  voice_sample_url text,
+  created_at timestamptz default now()
+);
+
+alter table user_settings enable row level security;
+
+create policy "Users can view own settings"
+  on user_settings for select
+  using (auth.uid() = user_id);
+
+create policy "Users can manage own settings"
+  on user_settings for all
+  using (auth.uid() = user_id);
+
+
+-- ── Voice Clones ────────────────────────────────────────────────────────────
+
+create table if not exists voice_clones (
+  id uuid primary key default gen_random_uuid(),
+  project_id uuid references projects on delete cascade not null,
+  language text not null,
+  sarvam_voice_id text,
+  status text default 'not_started',
+  consent_given_at timestamptz,
+  ready_audio_url text,
+  created_at timestamptz default now()
+);
+
+alter table voice_clones enable row level security;
+
+create policy "Users can view own clones"
+  on voice_clones for select
+  using (
+    project_id in (
+      select id from projects where user_id = auth.uid()
+    )
+  );
+
+create policy "Users can create own clones"
+  on voice_clones for insert
+  with check (
+    project_id in (
+      select id from projects where user_id = auth.uid()
+    )
+  );
+
+create policy "Users can update own clones"
+  on voice_clones for update
+  using (
+    project_id in (
+      select id from projects where user_id = auth.uid()
+    )
+  );
+
+
 -- ── Exports ─────────────────────────────────────────────────────────────────
 
 create table if not exists exports (

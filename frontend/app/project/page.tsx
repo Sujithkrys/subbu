@@ -4,7 +4,8 @@ import { useState, useEffect, useRef, Suspense, useCallback } from "react";
 import { useSearchParams, useRouter } from "next/navigation";
 import {
   Clapperboard, Captions, Languages, Paintbrush, Download,
-  ChevronDown, ChevronLeft, Plus, Trash2, Play, Pause, Upload
+  ChevronDown, ChevronLeft, Plus, Trash2, Play, Pause, Upload,
+  Mic, Volume2
 } from "lucide-react";
 import {
   getProject,
@@ -15,8 +16,9 @@ import {
 } from "@/lib/api";
 import type { ProjectDetailResponse, Transcript, StylePreset, Segment } from "@/lib/types";
 import { STYLE_PRESETS } from "@/lib/types";
+import CloningPanel from "@/components/CloningPanel";
 
-const LANGS: Record<string, string> = { te: "Telugu", hi: "Hindi", en: "English", ta: "Tamil", ml: "Malayalam", kn: "Kannada", bn: "Bengali", mr: "Marathi", gu: "Gujarati" };
+const LANGS: Record<string, string> = { te: "Telugu", hi: "Hindi", en: "English", ta: "Tamil", ml: "Malayalam", kn: "Kannada", bn: "Bengali", mr: "Marathi", gu: "Gujarati", pa: "Punjabi", hinglish: "Hinglish", tinglish: "Tinglish", tanglish: "Tanglish", benglish: "Benglish" };
 const PRESETS = [
   { id: "minimal", name: "Minimal", css: { fontSize: 14, background: "rgba(0,0,0,0.6)", fontWeight: 400 } },
   { id: "bold", name: "Bold Pop", css: { fontSize: 18, background: "rgba(0,0,0,0.8)", fontWeight: 700 } },
@@ -32,8 +34,11 @@ function EditorContent() {
   const [project, setProject] = useState<ProjectDetailResponse | null>(null);
   const [loading, setLoading] = useState(true);
   
-  const [tool, setTool] = useState<"captions" | "languages" | "style">("captions");
+  const [tool, setTool] = useState<"cloning" | "captions" | "style">("captions");
   const [lang, setLang] = useState<string>("");
+  const [hasVoiceSample, setHasVoiceSample] = useState(false);
+  const [activeCloneLang, setActiveCloneLang] = useState<string | null>(null);
+  const [clones, setClones] = useState<Record<string, any>>({});
   const [time, setTime] = useState(0);
   const [playing, setPlaying] = useState(false);
   const [selectedId, setSelectedId] = useState<number | null>(null);
@@ -70,6 +75,14 @@ function EditorContent() {
       setProject(data);
       if (data.transcripts && data.transcripts.length > 0) {
         setLang(data.transcripts[0].language);
+      }
+
+      // Check for voice sample
+      const { data: settingsData } = await sb.from("user_settings").select("voice_sample_url").eq("user_id", user.id).single();
+      if (settingsData && settingsData.voice_sample_url) {
+        setHasVoiceSample(true);
+      } else {
+        setHasVoiceSample(false);
       }
     } catch (err) {
       console.error(err);
@@ -249,8 +262,8 @@ function EditorContent() {
   const activePreset = PRESETS.find(p => p.name === project?.style?.font) || PRESETS[0];
 
   const tools = [
+    { id: "cloning", label: "Cloning", icon: Mic },
     { id: "captions", label: "Captions", icon: Captions },
-    { id: "languages", label: "Languages", icon: Languages },
     { id: "style", label: "Style", icon: Paintbrush },
   ] as const;
 
@@ -284,6 +297,22 @@ function EditorContent() {
               <button onClick={exportSrt} className="w-full rounded-lg px-3 py-2 text-left text-xs hover:opacity-70 transition-opacity">SRT file ({LANGS[lang] || lang})</button>
               <button onClick={() => { setExportOpen(false); fireToast("VTT export queued"); }} className="w-full rounded-lg px-3 py-2 text-left text-xs hover:opacity-70 transition-opacity">VTT file</button>
               <button onClick={triggerBurnExport} className="w-full rounded-lg px-3 py-2 text-left text-xs hover:opacity-70 transition-opacity">Burned-in MP4</button>
+              
+              {Object.keys(clones).length > 0 && Object.values(clones).some(c => c.status === "ready") ? (
+                <>
+                  <div className="my-1 h-px w-full bg-black/10 dark:bg-white/10" />
+                  {Object.values(clones).filter(c => c.status === "ready").map(c => (
+                    <button key={c.language} onClick={() => { setExportOpen(false); fireToast(`Downloading ${LANGS[c.language] || c.language} dub...`); window.open(c.ready_audio_url, "_blank"); }} className="w-full rounded-lg px-3 py-2 text-left text-xs hover:opacity-70 transition-opacity">
+                      Dubbed audio ({LANGS[c.language] || c.language})
+                    </button>
+                  ))}
+                </>
+              ) : (
+                <>
+                  <div className="my-1 h-px w-full bg-black/10 dark:bg-white/10" />
+                  <button disabled className="w-full rounded-lg px-3 py-2 text-left text-xs opacity-50 cursor-not-allowed">Dubbed audio (None ready)</button>
+                </>
+              )}
             </div>
           )}
         </div>
@@ -311,20 +340,44 @@ function EditorContent() {
               <Clapperboard size={32} className="mb-4" />
               <p className="text-sm">Upload a video to start editing.</p>
             </div>
+          ) : tool === "cloning" ? (
+            <CloningPanel 
+              projectId={projectId!}
+              hasVoiceSample={hasVoiceSample}
+              onSampleUploaded={() => setHasVoiceSample(true)}
+              onPreviewChange={(l) => setActiveCloneLang(l)}
+              onClonesChange={(c) => setClones(c)}
+            />
           ) : tool === "captions" ? (
             <>
               <PanelTitle title="Captions" sub={`${LANGS[lang] || lang} · click a line to edit`} />
-              <div className="mb-3 flex flex-wrap gap-1.5">
-                {allLangs.map((l) => (
-                  <button
-                    key={l} onClick={() => setLang(l)}
-                    className="rounded-md px-2 py-1 text-[11px] font-medium transition-colors"
-                    style={lang === l ? { background: "var(--color-accent)", color: "#FFF" } : { background: "var(--color-input-bg)", color: "var(--color-text-secondary)" }}
-                  >
-                    {LANGS[l] || l}
-                  </button>
-                ))}
+              
+              <div className="mb-4">
+                <p className="mb-2 text-[11px] font-medium" style={{ color: "var(--color-text-secondary)" }}>Languages</p>
+                <div className="flex flex-wrap gap-1.5">
+                  {allLangs.map((l) => (
+                    <button
+                      key={l} onClick={() => setLang(l)}
+                      className="rounded-md px-2 py-1 text-[11px] font-medium transition-colors"
+                      style={lang === l ? { background: "var(--color-accent)", color: "#FFF" } : { background: "var(--color-input-bg)", color: "var(--color-text-secondary)" }}
+                    >
+                      {LANGS[l] || l}
+                    </button>
+                  ))}
+                </div>
               </div>
+
+              <div className="mb-4">
+                <p className="mb-2 text-[11px] font-medium" style={{ color: "var(--color-text-secondary)" }}>Add a language or code-mixed style</p>
+                <div className="flex flex-wrap gap-1.5">
+                  {Object.entries(LANGS).filter(([c]) => !allLangs.includes(c)).map(([c, name]) => (
+                    <button key={c} onClick={() => addLanguage(c)} className="rounded-md px-2.5 py-1 text-[11px] transition-colors hover:bg-black/5" style={{ background: "var(--color-input-bg)", color: "var(--color-text-secondary)", border: "1px solid var(--color-border-theme)" }}>
+                      + {name}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
               <div className="flex-1 space-y-2 pb-10">
                 {captions.map((c, i) => (
                   <div
@@ -362,34 +415,9 @@ function EditorContent() {
                 </button>
               </div>
             </>
-          ) : tool === "languages" ? (
-            <>
-              <PanelTitle title="Languages" sub="One video, many audiences" />
-              <div className="space-y-2">
-                {project?.transcripts?.map((t) => (
-                  <div key={t.id} className="flex items-center justify-between rounded-xl p-3" style={{ background: "var(--color-card)", border: "1px solid var(--color-border-theme)" }}>
-                    <div>
-                      <p className="text-xs font-medium">{LANGS[t.language] || t.language}</p>
-                      <p className="text-[10px]" style={{ color: t.source === "asr" ? "var(--color-green-theme)" : "var(--color-amber-theme)" }}>
-                        {t.source === "asr" ? "Source · reviewed" : "Translated · review before export"}
-                      </p>
-                    </div>
-                    <button onClick={() => { setLang(t.language); setTool("captions"); }} className="text-[11px] transition-opacity hover:opacity-70" style={{ color: "var(--color-accent)" }}>Edit</button>
-                  </div>
-                ))}
-              </div>
-              <p className="mb-2 mt-4 text-[11px]" style={{ color: "var(--color-text-secondary)" }}>Add a language</p>
-              <div className="flex flex-wrap gap-1.5">
-                {Object.entries(LANGS).filter(([c]) => !allLangs.includes(c)).map(([c, name]) => (
-                  <button key={c} onClick={() => addLanguage(c)} className="rounded-md px-2.5 py-1.5 text-[11px] transition-colors hover:bg-black/5" style={{ background: "var(--color-input-bg)", color: "var(--color-text-secondary)", border: "1px solid var(--color-border-theme)" }}>
-                    + {name}
-                  </button>
-                ))}
-              </div>
-            </>
           ) : tool === "style" ? (
             <>
-              <PanelTitle title="Style" sub="Applies live to the preview" />
+              <PanelTitle title="Caption styles" sub="Applies live to the preview" />
               <div className="grid grid-cols-2 gap-2">
                 {PRESETS.map((p) => (
                   <button
@@ -470,32 +498,79 @@ function EditorContent() {
 
           {/* timeline strip */}
           <div className="mx-auto mt-3 w-full max-w-3xl">
-            <div className="mb-1 flex justify-between text-[10px]" style={{ color: "#8A8A8A" }}>
+            <div className="mb-1 flex justify-between text-[10px]" style={{ color: "var(--color-text-secondary)" }}>
               <span>{fmt(time)}</span><span>{fmt(dur)}</span>
             </div>
-            <div
-              className="relative h-12 cursor-pointer overflow-hidden rounded-lg"
-              style={{ background: "var(--color-track-fixed, #1A1A1A)" }}
+            <div 
+              className="cursor-pointer select-none rounded-xl p-2"
+              style={{ background: "var(--color-card)", border: "1px solid var(--color-border-theme)" }}
               onClick={(e) => {
-                const r = e.currentTarget.getBoundingClientRect();
-                seek(((e.clientX - r.left) / r.width) * dur);
+                // Find the track container to calculate relative click
+                const trackContainer = e.currentTarget.querySelector('.timeline-tracks');
+                if (trackContainer) {
+                  const r = trackContainer.getBoundingClientRect();
+                  let percent = (e.clientX - r.left) / r.width;
+                  percent = Math.max(0, Math.min(1, percent));
+                  seek(percent * dur);
+                }
               }}
             >
-              {captions.map((c, i) => (
-                <div
-                  key={i}
-                  onClick={(e) => { e.stopPropagation(); setSelectedId(i); seek(c.start); }}
-                  className="absolute top-2 flex h-8 items-center justify-center overflow-hidden rounded-md px-1 transition-colors hover:brightness-110"
-                  style={{
-                    left: `${(c.start / dur) * 100}%`, width: `${((c.end - c.start) / dur) * 100}%`,
-                    background: currentCaption === c ? "var(--color-accent)" : "rgba(116,105,182,0.45)",
-                  }}
-                >
-                  <span className="truncate text-[9px] text-white">{c.text || "…"}</span>
+              <div className="flex gap-3 relative">
+                {/* Labels Column */}
+                <div className="w-16 flex flex-col gap-1.5 shrink-0">
+                  <div className="flex items-center gap-1.5 h-7 text-[9px] font-medium" style={{ color: "var(--color-text-secondary)" }}>
+                    <Clapperboard size={10} /> Video
+                  </div>
+                  <div className="flex items-center gap-1.5 h-7 text-[9px] font-medium" style={{ color: "var(--color-text-secondary)" }}>
+                    <Mic size={10} /> Dubbing
+                  </div>
+                  <div className="flex items-center gap-1.5 h-7 text-[9px] font-medium" style={{ color: "var(--color-text-secondary)" }}>
+                    <Captions size={10} /> Captions
+                  </div>
                 </div>
-              ))}
-              <div className="pointer-events-none absolute bottom-0 top-0 w-px" style={{ left: `${(time / dur) * 100}%`, background: "#E5484D" }}>
-                <div className="absolute -left-[5px] top-0 h-3 w-[11px] rounded-b-md" style={{ background: "#E5484D" }} />
+
+                {/* Tracks Column */}
+                <div className="timeline-tracks flex-1 flex flex-col gap-1.5 relative">
+                  {/* Track 1: Video */}
+                  <div className="relative h-7 w-full rounded overflow-hidden" style={{ background: "var(--color-track-fixed, rgba(255,255,255,0.05))" }}>
+                    <div className="absolute inset-0 bg-white/5" />
+                  </div>
+
+                  {/* Track 2: Dubbing */}
+                  <div className="relative h-7 w-full rounded overflow-hidden" style={{ background: "var(--color-input-bg)" }}>
+                    {activeCloneLang ? (
+                       <div className="absolute inset-0 rounded flex items-center justify-center text-[9px] font-medium" style={{ background: "rgba(76,175,125,0.15)", color: "#4caf7d", border: "1px solid rgba(76,175,125,0.3)" }}>
+                         {LANGS[activeCloneLang] || activeCloneLang} dub ready
+                       </div>
+                    ) : (
+                       <div className="absolute inset-0 flex items-center justify-center text-[9px] font-medium border border-dashed rounded" style={{ borderColor: "var(--color-border-theme)", color: "var(--color-text-muted)" }}>
+                         No voice clone preview
+                       </div>
+                    )}
+                  </div>
+
+                  {/* Track 3: Captions */}
+                  <div className="relative h-7 w-full rounded overflow-hidden" style={{ background: "var(--color-input-bg)" }}>
+                    {captions.map((c, i) => (
+                      <div
+                        key={i}
+                        onClick={(e) => { e.stopPropagation(); setSelectedId(i); seek(c.start); }}
+                        className="absolute top-0 bottom-0 flex items-center justify-center overflow-hidden rounded px-1 transition-colors hover:brightness-110"
+                        style={{
+                          left: `${(c.start / dur) * 100}%`, width: `${((c.end - c.start) / dur) * 100}%`,
+                          background: currentCaption === c ? "var(--color-accent)" : "rgba(116,105,182,0.45)",
+                        }}
+                      >
+                        <span className="truncate text-[8px] text-white">{c.text || "…"}</span>
+                      </div>
+                    ))}
+                  </div>
+                  
+                  {/* Playhead */}
+                  <div className="pointer-events-none absolute bottom-0 top-0 w-px z-20" style={{ left: `${(time / dur) * 100}%`, background: "#E5484D" }}>
+                    <div className="absolute -left-[3px] -top-1 h-2 w-[7px] rounded-sm" style={{ background: "#E5484D" }} />
+                  </div>
+                </div>
               </div>
             </div>
           </div>
