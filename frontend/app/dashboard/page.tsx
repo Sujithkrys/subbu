@@ -16,11 +16,6 @@ function DashboardContent() {
   const [userName, setUserName] = useState("Creator");
   const [loading, setLoading] = useState(true);
 
-  // Upload modal state
-  const [showModal, setShowModal] = useState(false);
-  const [newTitle, setNewTitle] = useState("");
-  const [creating, setCreating] = useState(false);
-
   useEffect(() => {
     async function loadData() {
       try {
@@ -53,18 +48,7 @@ function DashboardContent() {
     loadData();
   }, []);
 
-  const handleCreate = async () => {
-    if (!newTitle.trim()) return;
-    setCreating(true);
-    try {
-      const project = await createProject({ title: newTitle });
-      router.push(`/project?id=${project.id}`);
-    } catch (err) {
-      console.error("Failed to create project:", err);
-    } finally {
-      setCreating(false);
-    }
-  };
+
 
   const shown = projects.filter((p) => (p.title || "Untitled").toLowerCase().includes(q.toLowerCase()));
 
@@ -106,7 +90,7 @@ function DashboardContent() {
           <p className="text-sm" style={{ color: "var(--color-text-secondary)" }}>{projects.length} projects · {totalLangs} languages</p>
         </div>
         <button 
-          onClick={() => setShowModal(true)}
+          onClick={() => router.push("/project")}
           className="flex items-center gap-2 rounded-xl px-4 py-2.5 text-sm font-medium transition-transform hover:scale-[1.02]" 
           style={{ background: "var(--color-pill)", color: "var(--color-pill-text)" }}
         >
@@ -144,7 +128,7 @@ function DashboardContent() {
         <div className="py-20 text-center flex flex-col items-center">
           <p className="mb-4 text-sm" style={{ color: "var(--color-text-secondary)" }}>No projects found. Ready to caption your first video?</p>
           <button 
-            onClick={() => setShowModal(true)}
+            onClick={() => router.push("/project")}
             className="flex items-center gap-2 rounded-xl px-4 py-2.5 text-sm font-medium" 
             style={{ background: "var(--color-pill)", color: "var(--color-pill-text)" }}
           >
@@ -181,43 +165,7 @@ function DashboardContent() {
         </div>
       )}
 
-      {/* Create Modal */}
-      {showModal && (
-        <div
-          style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.6)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 100, backdropFilter: "blur(4px)" }}
-          onClick={() => setShowModal(false)}
-        >
-          <div className="animate-fade-in" style={{ width: "100%", maxWidth: "440px", padding: "32px", background: "var(--color-card)", borderRadius: "16px", border: "1px solid var(--color-border-theme)" }} onClick={(e) => e.stopPropagation()}>
-            <h2 style={{ fontSize: "1.3rem", fontWeight: 700, marginBottom: "20px" }}>Create New Project</h2>
-            <input 
-              placeholder="Project title..." 
-              value={newTitle} 
-              onChange={(e) => setNewTitle(e.target.value)} 
-              autoFocus 
-              onKeyDown={(e) => e.key === "Enter" && handleCreate()}
-              className="w-full rounded-xl py-2 px-3 text-sm outline-none"
-              style={{ background: "var(--color-input-bg)", border: "1px solid var(--color-border-theme)", color: "var(--color-text-primary)" }}
-            />
-            <div style={{ display: "flex", gap: "12px", marginTop: "24px", justifyContent: "flex-end" }}>
-              <button 
-                onClick={() => setShowModal(false)}
-                className="px-4 py-2 rounded-lg text-sm"
-                style={{ background: "var(--color-input-bg)", color: "var(--color-text-primary)", border: "1px solid var(--color-border-theme)" }}
-              >
-                Cancel
-              </button>
-              <button 
-                onClick={handleCreate} 
-                disabled={creating || !newTitle.trim()}
-                className="px-4 py-2 rounded-lg text-sm font-medium"
-                style={{ background: "var(--color-pill)", color: "var(--color-pill-text)", opacity: (creating || !newTitle.trim()) ? 0.5 : 1 }}
-              >
-                {creating ? "Creating..." : "Create & Upload"}
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
+
     </main>
   );
 }

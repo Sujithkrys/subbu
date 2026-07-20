@@ -8,37 +8,15 @@ export default function Sidebar() {
   const pathname = usePathname();
   const router = useRouter();
   const [mostRecentProjectId, setMostRecentProjectId] = useState<string | null>(null);
-  
-  useEffect(() => {
-    // Fetch most recent project for the Editor link
-    async function fetchRecent() {
-      try {
-        const { listProjects } = await import("@/lib/api");
-        const res = await listProjects();
-        if (res.projects && res.projects.length > 0) {
-          // Assuming projects are sorted by created_at descending by default or just take the first one
-          setMostRecentProjectId(res.projects[0].id);
-        }
-      } catch (err) {
-        console.error("Failed to fetch recent project", err);
-      }
-    }
-    fetchRecent();
-  }, [pathname]); // re-fetch on navigation
+  const handleEditorClick = () => {
+    router.push("/project");
+  };
 
   // Hide sidebar on editor pages, login, signup, home
   const hideSidebar = pathname?.startsWith("/project/") || pathname === "/" || pathname === "/login" || pathname === "/signup";
   if (hideSidebar) return null;
 
   const currentMenu = pathname?.startsWith("/settings") ? "settings" : "dashboard";
-
-  const handleEditorClick = () => {
-    if (mostRecentProjectId) {
-      router.push(`/project?id=${mostRecentProjectId}`);
-    } else {
-      router.push("/dashboard");
-    }
-  };
 
   const items = [
     { id: "dashboard", label: "Dashboard", icon: LayoutDashboard, go: () => router.push("/dashboard") },

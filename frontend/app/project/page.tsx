@@ -4,7 +4,7 @@ import { useState, useEffect, useRef, Suspense, useCallback } from "react";
 import { useSearchParams, useRouter } from "next/navigation";
 import {
   Clapperboard, Captions, Languages, Paintbrush, Download,
-  ChevronDown, ChevronLeft, Plus, Trash2, Play, Pause
+  ChevronDown, ChevronLeft, Plus, Trash2, Play, Pause, Upload
 } from "lucide-react";
 import {
   getProject,
@@ -40,13 +40,13 @@ function EditorContent() {
   const [exportOpen, setExportOpen] = useState(false);
   const [toast, setToast] = useState("");
   
+  const [uploadingVideo, setUploadingVideo] = useState(false);
+  const [uploadProgress, setUploadProgress] = useState(0);
+  const [localVideoUrl, setLocalVideoUrl] = useState<string | null>(null);
+
   const videoRef = useRef<HTMLVideoElement>(null);
 
   useEffect(() => {
-    if (!projectId) {
-      router.push("/dashboard");
-      return;
-    }
     loadProject();
   }, [projectId]);
 
@@ -57,6 +57,12 @@ function EditorContent() {
       const { data: { user } } = await sb.auth.getUser();
       if (!user) {
         router.push("/login");
+        return;
+      }
+
+      if (!projectId) {
+        setProject(null);
+        setLoading(false);
         return;
       }
 
@@ -107,6 +113,32 @@ function EditorContent() {
   };
 
   const currentCaption = captions.find(c => time >= c.start && time <= c.end);
+
+  const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    
+    setUploadingVideo(true);
+    setUploadProgress(0);
+    const localUrl = URL.createObjectURL(file);
+    setLocalVideoUrl(localUrl);
+
+    try {
+      const { createProject, uploadVideoToR2 } = await import("@/lib/api");
+      const title = file.name.replace(/\.[^/.]+$/, "");
+      const newProject = await createProject({ title });
+      
+      await uploadVideoToR2(newProject.upload_url, file, (pct) => setUploadProgress(pct));
+      
+      fireToast("Video uploaded successfully!");
+      router.replace(`/project?id=${newProject.id}`);
+    } catch (err) {
+      console.error(err);
+      fireToast("Upload failed. Please try again.");
+      setUploadingVideo(false);
+      setLocalVideoUrl(null);
+    }
+  };
 
   // Auto-save logic
   const saveSegments = async (newSegments: Segment[]) => {
@@ -209,12 +241,12 @@ function EditorContent() {
     }
   };
 
-  if (loading || !project) {
+  if (loading) {
     return <div className="flex-1 flex items-center justify-center h-screen" style={{ background: "var(--color-bg-theme)" }}><p style={{color: "var(--color-text-secondary)"}}>Loading editor...</p></div>;
   }
 
-  const allLangs = project.transcripts.map(t => t.language);
-  const activePreset = PRESETS.find(p => p.name === project.style?.font) || PRESETS[0];
+  const allLangs = project?.transcripts?.map(t => t.language) || [];
+  const activePreset = PRESETS.find(p => p.name === project?.style?.font) || PRESETS[0];
 
   const tools = [
     { id: "captions", label: "Captions", icon: Captions },
@@ -232,10 +264,12 @@ function EditorContent() {
           <button onClick={() => router.push("/dashboard")} className="rounded-lg p-1.5 hover:opacity-70 transition-opacity">
             <ChevronLeft size={17} />
           </button>
-          <span className="text-sm font-medium">{project.title || "Untitled"}</span>
-          <span className="rounded-md px-2 py-0.5 text-[11px] font-medium" style={{ color: "var(--color-green-theme)", background: "rgba(76,175,125,0.15)" }}>
-            Ready
-          </span>
+          <span className="text-sm font-medium">{project ? project.title || "Untitled" : "New Project"}</span>
+          {project && (
+            <span className="rounded-md px-2 py-0.5 text-[11px] font-medium" style={{ color: "var(--color-green-theme)", background: "rgba(76,175,125,0.15)" }}>
+              Ready
+            </span>
+          )}
         </div>
         <div className="relative">
           <button
@@ -272,7 +306,12 @@ function EditorContent() {
 
         {/* tool panel */}
         <section className="flex w-72 flex-col overflow-y-auto px-4 py-4" style={{ background: "var(--color-panel)", borderRight: "1px solid var(--color-border-theme)" }}>
-          {tool === "captions" && (
+          {!project ? (
+            <div className="flex flex-col items-center justify-center h-full text-center opacity-50">
+              <Clapperboard size={32} className="mb-4" />
+              <p className="text-sm">Upload a video to start editing.</p>
+            </div>
+          ) : tool === "captions" ? (
             <>
               <PanelTitle title="Captions" sub={`${LANGS[lang] || lang} · click a line to edit`} />
               <div className="mb-3 flex flex-wrap gap-1.5">
@@ -323,13 +362,11 @@ function EditorContent() {
                 </button>
               </div>
             </>
-          )}
-
-          {tool === "languages" && (
+          ) : tool === "languages" ? (
             <>
               <PanelTitle title="Languages" sub="One video, many audiences" />
               <div className="space-y-2">
-                {project.transcripts.map((t) => (
+                {project?.transcripts?.map((t) => (
                   <div key={t.id} className="flex items-center justify-between rounded-xl p-3" style={{ background: "var(--color-card)", border: "1px solid var(--color-border-theme)" }}>
                     <div>
                       <p className="text-xs font-medium">{LANGS[t.language] || t.language}</p>
@@ -350,9 +387,7 @@ function EditorContent() {
                 ))}
               </div>
             </>
-          )}
-
-          {tool === "style" && (
+          ) : tool === "style" ? (
             <>
               <PanelTitle title="Style" sub="Applies live to the preview" />
               <div className="grid grid-cols-2 gap-2">
@@ -374,7 +409,7 @@ function EditorContent() {
                 ))}
               </div>
             </>
-          )}
+          ) : null}
         </section>
 
         {/* preview column — always dark theme background for video readability */}
@@ -383,7 +418,27 @@ function EditorContent() {
             className="relative mx-auto flex aspect-video w-full max-w-3xl flex-1 items-center justify-center overflow-hidden rounded-lg"
             style={{ background: "linear-gradient(135deg, #8D80C7 0%, #7469B6 60%, #665BA6 100%)", maxHeight: "100%" }}
           >
-            {project.video_download_url ? (
+            {!project && !uploadingVideo ? (
+              <label className="cursor-pointer flex flex-col items-center justify-center w-full h-full hover:bg-black/10 transition-colors">
+                <input type="file" accept="video/mp4,video/quicktime,video/webm" className="hidden" onChange={handleFileUpload} />
+                <Upload size={48} color="white" className="mb-4 opacity-80" />
+                <span className="text-white font-medium text-lg">Click to upload video</span>
+                <span className="text-white/60 text-sm mt-2">MP4, MOV, WEBM (Max 500MB)</span>
+              </label>
+            ) : uploadingVideo ? (
+              <div className="flex flex-col items-center justify-center w-full h-full text-white">
+                {localVideoUrl && (
+                  <video src={localVideoUrl} className="absolute inset-0 w-full h-full object-contain opacity-40 blur-sm" />
+                )}
+                <div className="z-10 flex flex-col items-center w-64">
+                  <p className="mb-3 font-medium text-lg shadow-black drop-shadow-md">Uploading...</p>
+                  <div className="w-full bg-black/50 rounded-full h-2 mb-2 overflow-hidden">
+                    <div className="bg-white h-2 rounded-full transition-all duration-300" style={{ width: `${uploadProgress}%` }}></div>
+                  </div>
+                  <p className="text-xs text-white/80">{uploadProgress}%</p>
+                </div>
+              </div>
+            ) : project?.video_download_url ? (
               <video 
                 ref={videoRef}
                 src={project.video_download_url} 
@@ -394,7 +449,7 @@ function EditorContent() {
               />
             ) : null}
             
-            {!playing && (
+            {!playing && project && !uploadingVideo && (
               <button
                 onClick={togglePlay}
                 className="flex h-14 w-14 items-center justify-center rounded-full transition-transform hover:scale-105 z-10"
