@@ -13,7 +13,7 @@ export default function Sidebar() {
   };
 
   // Hide sidebar on editor pages, login, signup, home
-  const hideSidebar = pathname?.startsWith("/project/") || pathname === "/" || pathname === "/login" || pathname === "/signup";
+  const hideSidebar = pathname?.startsWith("/project") || pathname === "/" || pathname === "/login" || pathname === "/signup";
   if (hideSidebar) return null;
 
   const currentMenu = pathname?.startsWith("/settings") ? "settings" : "dashboard";
