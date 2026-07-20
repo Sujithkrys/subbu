@@ -334,15 +334,19 @@ function EditorContent() {
         </aside>
 
         {/* tool panel */}
-        <section className="flex w-72 flex-col overflow-y-auto px-4 py-4" style={{ background: "var(--color-panel)", borderRight: "1px solid var(--color-border-theme)" }}>
-          {!project ? (
-            <div className="flex flex-col items-center justify-center h-full text-center opacity-50">
-              <Clapperboard size={32} className="mb-4" />
-              <p className="text-sm">Upload a video to start editing.</p>
+        <section className="relative flex w-72 flex-col overflow-y-auto px-4 py-4" style={{ background: "var(--color-panel)", borderRight: "1px solid var(--color-border-theme)" }}>
+          {!project && (
+            <div className="absolute inset-0 z-50 flex flex-col items-center justify-center bg-white/40 dark:bg-black/60 backdrop-blur-[2px] text-center px-4">
+              <div className="bg-white dark:bg-black p-4 rounded-xl shadow-lg border border-black/10 dark:border-white/10 flex flex-col items-center">
+                <Clapperboard size={24} className="mb-2 opacity-70" />
+                <p className="text-xs font-medium">Upload a video first</p>
+              </div>
             </div>
-          ) : tool === "cloning" ? (
+          )}
+          
+          {tool === "cloning" ? (
             <CloningPanel 
-              projectId={projectId!}
+              projectId={projectId || ""}
               hasVoiceSample={hasVoiceSample}
               onSampleUploaded={() => setHasVoiceSample(true)}
               onPreviewChange={(l) => setActiveCloneLang(l)}
