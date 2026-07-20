@@ -83,32 +83,56 @@ async def process_voice_clone(clone_id: str, project_id: str, lang: str, user_id
     sb = get_supabase()
     api_key = os.getenv("SARVAM_API_KEY", "")
     
+    LANG_MAP = {
+        "hi": "hi-IN", "te": "te-IN", "ta": "ta-IN", "ml": "ml-IN", 
+        "kn": "kn-IN", "bn": "bn-IN", "mr": "mr-IN", "gu": "gu-IN", 
+        "pa": "pa-IN", "en": "en-IN", "hinglish": "hi-IN", 
+        "tinglish": "te-IN", "tanglish": "ta-IN", "benglish": "bn-IN"
+    }
+    
     try:
-        # If no real API key, simulate processing
-        if not api_key or api_key == "your_sarvam_api_key_here":
-            await asyncio.sleep(5) # Simulate processing time
-            sb.table("voice_clones").update({
-                "status": "ready",
-                "ready_audio_url": MOCK_AUDIO_URL,
-                "sarvam_voice_id": "mock_voice_123"
-            }).eq("id", clone_id).execute()
-            return
-
-        # Real Sarvam API integration would go here
-        # 1. Fetch user's voice sample
-        # 2. Call sarvam create_voice
-        # 3. Call bulbul:v3 with project's translated segments
-        # 4. Upload resulting audio to R2
-        # 5. Update ready_audio_url
+        import base64
+        import uuid
+        from sarvamai import SarvamAI
+        from services.storage_service import upload_file_to_r2
         
-        # Placeholder for real integration:
-        async with httpx.AsyncClient() as client:
-            # Example API call (adapt to actual Sarvam endpoints)
-            pass
+        if not api_key or api_key == "your_sarvam_api_key_here":
+            raise Exception("SARVAM_API_KEY is not set or is using the default placeholder.")
             
+        transcript_res = sb.table("transcripts").select("segments").eq("project_id", project_id).eq("language", lang).execute()
+        if not transcript_res.data:
+            transcript_res = sb.table("transcripts").select("segments").eq("project_id", project_id).order("created_at", desc=False).execute()
+            if not transcript_res.data:
+                raise Exception("No transcripts found for this project to clone.")
+                
+        segments = transcript_res.data[0].get("segments", [])
+        if not segments:
+            raise Exception("Transcript has no segments.")
+            
+        full_text = " ".join([s.get("text", "") for s in segments])
+        if len(full_text) > 2400:
+            full_text = full_text[:2400] + "..." # Truncate due to TTS length limits
+            
+        sarvam_lang = LANG_MAP.get(lang, "hi-IN")
+        client = SarvamAI(api_subscription_key=api_key)
+        
+        response = client.text_to_speech.convert(
+            text=full_text,
+            target_language_code=sarvam_lang,
+            speaker="meera", # Fallback default standard speaker if voice cloning isn't explicitly configured in SDK
+            model="bulbul:v3",
+            pace=1.0
+        )
+        
+        audio_data = base64.b64decode(response.audios[0])
+        object_name = f"clones/{project_id}/{lang}_{uuid.uuid4()}.wav"
+        upload_file_to_r2(audio_data, object_name, "audio/wav")
+        
+        url = f"{os.getenv('R2_ENDPOINT')}/{os.getenv('R2_BUCKET_NAME')}/{object_name}"
         sb.table("voice_clones").update({
             "status": "ready",
-            "ready_audio_url": MOCK_AUDIO_URL # Fallback
+            "ready_audio_url": url,
+            "sarvam_voice_id": "bulbul_v3"
         }).eq("id", clone_id).execute()
 
     except Exception as e:

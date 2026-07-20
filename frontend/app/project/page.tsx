@@ -431,8 +431,10 @@ function EditorContent() {
                     className="rounded-xl p-3 text-center transition-transform hover:scale-105"
                     style={{ background: "var(--color-card)", border: `2px solid ${activePreset?.id === p.id ? "var(--color-accent)" : "var(--color-border-theme)"}` }}
                   >
-                    <span className="rounded px-1.5 py-0.5 text-[11px] text-white" style={p.css}>సరళ</span>
-                    <p className="mt-2 text-[11px]" style={{ color: "var(--color-text-secondary)" }}>{p.name}</p>
+                    <div className="flex h-16 w-full items-center justify-center rounded-lg mb-2" style={{ background: "var(--color-input-bg)" }}>
+                      <span className="rounded-md px-3 py-1.5 text-[14px]" style={p.css}>సరళ</span>
+                    </div>
+                    <span className="text-[12px]" style={{ color: "var(--color-text-primary)" }}>{p.name}</span>
                   </button>
                 ))}
               </div>

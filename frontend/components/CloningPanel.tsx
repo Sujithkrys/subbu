@@ -202,8 +202,7 @@ export default function CloningPanel({
         
         return (
           <div key={code} className="rounded-xl overflow-hidden transition-all" style={{ background: "var(--color-card)", border: "1px solid var(--color-border-theme)" }}>
-            <div 
-              className="flex items-center justify-between p-3 cursor-pointer"
+              <div className="flex items-center justify-between p-4 cursor-pointer"
               onClick={() => {
                 if (clone.status === "not_started" || clone.status === "failed") {
                   setExpandedLang(isExpanded ? null : code);
@@ -211,25 +210,32 @@ export default function CloningPanel({
                 }
               }}
             >
-              <div>
-                <p className="text-xs font-medium">{name}</p>
-                <div className="mt-1 flex items-center gap-1.5 text-[10px]">
-                  {clone.status === "not_started" && <span style={{ color: "var(--color-text-secondary)" }}>Not started</span>}
-                  {clone.status === "cloning" && <span className="flex items-center gap-1" style={{ color: "var(--color-accent)" }}><Loader2 size={10} className="animate-spin" /> Cloning...</span>}
-                  {clone.status === "ready" && <span className="flex items-center gap-1 text-green-500"><Check size={10} /> Ready</span>}
-                  {clone.status === "failed" && <span className="flex items-center gap-1 text-red-500"><AlertCircle size={10} /> Failed</span>}
-                </div>
-              </div>
+              <p className="text-[13px] font-bold">{name}</p>
               
-              {clone.status === "ready" && (
-                <button 
-                  onClick={(e) => { e.stopPropagation(); onPreviewChange(code); }}
-                  className="p-1.5 rounded-full hover:bg-black/5 transition-colors"
-                  style={{ color: "var(--color-accent)" }}
-                >
-                  <Play size={14} />
-                </button>
-              )}
+              <div className="flex items-center gap-2">
+                <div className="flex items-center gap-1.5 text-[11px]">
+                  {clone.status === "not_started" && <span style={{ color: "var(--color-text-secondary)" }}>Not started</span>}
+                  {clone.status === "cloning" && <span className="flex items-center gap-1" style={{ color: "var(--color-accent)" }}><Loader2 size={12} className="animate-spin" /> Cloning...</span>}
+                  {clone.status === "ready" && (
+                    <div className="flex items-center gap-1.5 text-green-500">
+                      <button 
+                        onClick={(e) => { e.stopPropagation(); onPreviewChange(code); }}
+                        className="hover:opacity-70 transition-opacity"
+                        style={{ color: "var(--color-accent)" }}
+                      >
+                        <Volume2 size={13} />
+                      </button>
+                      <span>Ready</span>
+                    </div>
+                  )}
+                  {clone.status === "failed" && <span className="flex items-center gap-1 text-red-500"><AlertCircle size={12} /> Failed</span>}
+                </div>
+                <ChevronDown 
+                  size={14} 
+                  style={{ color: "var(--color-text-secondary)" }}
+                  className={`transition-transform duration-200 ${isExpanded ? 'rotate-180' : ''}`}
+                />
+              </div>
             </div>
             
             {isExpanded && (clone.status === "not_started" || clone.status === "failed") && (
