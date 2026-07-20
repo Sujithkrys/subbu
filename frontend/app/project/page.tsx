@@ -144,6 +144,8 @@ function EditorContent() {
       await uploadVideoToR2(newProject.upload_url, file, (pct) => setUploadProgress(pct));
       
       fireToast("Video uploaded successfully!");
+      setUploadingVideo(false);
+      setLocalVideoUrl(null);
       router.replace(`/project?id=${newProject.id}`);
     } catch (err) {
       console.error(err);
@@ -442,8 +444,8 @@ function EditorContent() {
         {/* preview column — always dark theme background for video readability */}
         <section className="flex min-w-0 flex-1 flex-col p-4" style={{ background: "var(--color-bg-dark-fixed, #0D0D0D)" }}>
           <div
-            className="relative mx-auto flex aspect-video w-full max-w-3xl flex-1 items-center justify-center overflow-hidden rounded-lg"
-            style={{ background: "linear-gradient(135deg, #8D80C7 0%, #7469B6 60%, #665BA6 100%)", maxHeight: "100%" }}
+            className="relative mx-auto flex w-full max-w-3xl flex-1 items-center justify-center overflow-hidden rounded-lg min-h-0"
+            style={{ background: "rgba(0,0,0,0.4)" }}
           >
             {!project && !uploadingVideo ? (
               <label className="cursor-pointer flex flex-col items-center justify-center w-full h-full hover:bg-black/10 transition-colors">
@@ -531,8 +533,14 @@ function EditorContent() {
                 {/* Tracks Column */}
                 <div className="timeline-tracks flex-1 flex flex-col gap-1.5 relative">
                   {/* Track 1: Video */}
-                  <div className="relative h-7 w-full rounded overflow-hidden" style={{ background: "var(--color-track-fixed, rgba(255,255,255,0.05))" }}>
-                    <div className="absolute inset-0 bg-white/5" />
+                  <div className="relative h-7 w-full rounded overflow-hidden" style={{ background: "var(--color-input-bg)" }}>
+                    {project ? (
+                      <div className="absolute inset-y-0 left-0 right-0 rounded flex items-center justify-center text-[9px] font-medium" style={{ background: "rgba(141,128,199,0.3)", border: "1px solid rgba(141,128,199,0.5)", color: "white" }}>
+                        {project.title || "Video Source"}
+                      </div>
+                    ) : (
+                      <div className="absolute inset-0 bg-white/5" />
+                    )}
                   </div>
 
                   {/* Track 2: Dubbing */}
