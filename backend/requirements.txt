@@ -8,7 +8,7 @@ groq==0.5.0
 pydantic>=2.0
 python-multipart
 qstash
-google-generativeai==0.4.1
+google-generativeai
 sarvamai==0.1.0
 pydub==0.25.1
 imageio-ffmpeg==0.5.1
