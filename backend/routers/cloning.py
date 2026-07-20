@@ -70,6 +70,11 @@ async def process_voice_clone(clone_id: str, project_id: str, lang: str, user_id
         import httpx
         from io import BytesIO
         from pydub import AudioSegment
+        import imageio_ffmpeg
+        
+        # Configure pydub to use the bundled ffmpeg binary
+        AudioSegment.converter = imageio_ffmpeg.get_ffmpeg_exe()
+        
         from services.sarvam_service import create_voice, generate_dubbed_segment
         from services.storage_service import upload_file_to_r2
         
