@@ -8,7 +8,7 @@ import asyncio
 
 from services.auth_service import get_current_user
 from db.supabase_client import get_supabase
-from services.storage_service import generate_presigned_url, upload_file_to_r2
+from services.storage_service import generate_upload_url
 
 router = APIRouter(prefix="/projects", tags=["cloning"])
 
@@ -145,10 +145,11 @@ async def process_voice_clone(clone_id: str, project_id: str, lang: str, user_id
         # 5. Export stitched audio and upload
         out_buf = BytesIO()
         final_audio.export(out_buf, format="wav")
-        out_bytes = out_buf.getvalue()
+        out_buf.seek(0)
         
         object_name = f"clones/{project_id}/{lang}_{uuid.uuid4()}.wav"
-        upload_file_to_r2(out_bytes, object_name, "audio/wav")
+        from services.storage_service import upload_fileobj
+        upload_fileobj(object_name, out_buf, "audio/wav")
         url = f"{os.getenv('R2_ENDPOINT')}/{os.getenv('R2_BUCKET_NAME')}/{object_name}"
         
         sb.table("voice_clones").update({

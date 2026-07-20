@@ -3,7 +3,7 @@ import uuid
 from fastapi import APIRouter, HTTPException, Depends, UploadFile, File, Form
 from db.supabase_client import get_supabase
 from services.auth_service import get_current_user
-from services.storage_service import upload_file_to_r2
+from services.storage_service import upload_fileobj
 
 router = APIRouter(prefix="/voice-samples", tags=["voice-samples"])
 
@@ -19,8 +19,9 @@ async def upload_voice_sample(
         file_ext = file.filename.split('.')[-1] if file.filename and '.' in file.filename else 'webm'
         object_name = f"voice_samples/{user['id']}/{uuid.uuid4()}.{file_ext}"
         
-        # Upload to R2
-        upload_file_to_r2(content, object_name, file.content_type or "audio/webm")
+        import io
+        buf = io.BytesIO(content)
+        upload_fileobj(object_name, buf, file.content_type or "audio/webm")
         url = f"{os.getenv('R2_ENDPOINT')}/{os.getenv('R2_BUCKET_NAME')}/{object_name}"
         
         # Save to database
