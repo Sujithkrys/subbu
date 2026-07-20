@@ -31,33 +31,13 @@ export default function CloningPanel({
   onPreviewChange: (lang: string | null) => void;
   onClonesChange: (clones: Record<string, any>) => void;
 }) {
-  const [samples, setSamples] = useState<VoiceSample[]>([]);
-  const [selectedSampleId, setSelectedSampleId] = useState<string>("");
-  const [loadingSamples, setLoadingSamples] = useState(true);
-  
   const [clones, setClones] = useState<Record<string, any>>({});
   const [expandedLang, setExpandedLang] = useState<string | null>(null);
   const [consentGiven, setConsentGiven] = useState(false);
   
   useEffect(() => {
     fetchClones();
-    fetchSamples();
   }, [projectId]);
-
-  const fetchSamples = async () => {
-    try {
-      setLoadingSamples(true);
-      const res = await apiFetch<VoiceSample[]>("/voice-samples");
-      setSamples(res || []);
-      if (res && res.length > 0) {
-        setSelectedSampleId(res[0].id);
-      }
-    } catch (err) {
-      console.error(err);
-    } finally {
-      setLoadingSamples(false);
-    }
-  };
 
   const fetchClones = async () => {
     try {
@@ -72,14 +52,14 @@ export default function CloningPanel({
   };
 
   const handleCloneStart = async (lang: string) => {
-    if (!consentGiven || !selectedSampleId) return;
+    if (!consentGiven) return;
     
     const newClones = { ...clones, [lang]: { ...clones[lang], status: "cloning" } };
     setClones(newClones);
     onClonesChange(newClones);
     
     try {
-      await startCloning(projectId, lang, selectedSampleId);
+      await startCloning(projectId, lang, "auto");
       pollStatus(lang);
     } catch (err) {
       console.error(err);
@@ -113,43 +93,24 @@ export default function CloningPanel({
     }, 5000);
   };
 
-  if (loadingSamples) {
-    return <div className="p-8 flex justify-center"><Loader2 className="animate-spin text-gray-400" /></div>;
-  }
-
-  if (samples.length === 0) {
-    return (
-      <div className="flex-1 space-y-4 px-1 pb-10 mt-4 animate-fade-in">
-        <div className="rounded-xl p-6 text-center" style={{ background: "var(--color-card)", border: "1px solid var(--color-border-theme)" }}>
-          <p className="mb-4 text-sm font-medium">No Voice Models Found</p>
-          <p className="mb-6 text-xs" style={{ color: "var(--color-text-secondary)" }}>
-            You need to add a reference voice sample before you can clone and dub videos.
-          </p>
-          <Link href="/settings/voice-samples" className="inline-block rounded-lg px-4 py-2 text-xs font-medium transition-opacity" style={{ background: "var(--color-accent)", color: "white" }}>
-            Manage Voice Samples
-          </Link>
-        </div>
-      </div>
-    );
-  }
-
   return (
-    <div className="flex-1 space-y-4 pb-10 mt-4 animate-fade-in">
-      {/* Sample Selector */}
-      <div className="px-1">
-        <label className="block text-xs mb-1.5 font-medium" style={{ color: "var(--color-text-secondary)" }}>Select Voice Model</label>
-        <select 
-          value={selectedSampleId}
-          onChange={(e) => setSelectedSampleId(e.target.value)}
-          className="w-full text-sm rounded-lg p-2.5 outline-none border transition-colors focus:border-purple-500"
-          style={{ background: "var(--color-input-bg)", color: "var(--color-text-primary)", borderColor: "var(--color-border-theme)" }}
-        >
-          {samples.map(s => (
-            <option key={s.id} value={s.id}>{s.label}</option>
-          ))}
-        </select>
+    <div className="flex-1 space-y-4 px-1 pb-10 mt-4 animate-fade-in">
+      {/* Consent Checkbox */}
+      <div className="rounded-xl border p-3.5 transition-colors" style={{ background: "var(--color-card)", borderColor: "var(--color-border-theme)" }}>
+        <label className="flex items-start gap-3 cursor-pointer">
+          <input 
+            type="checkbox" 
+            checked={consentGiven}
+            onChange={(e) => setConsentGiven(e.target.checked)}
+            className="mt-1 h-4 w-4 rounded border-gray-300 accent-purple-500" 
+          />
+          <span className="text-[11px] leading-relaxed" style={{ color: "var(--color-text-secondary)" }}>
+            I consent to using the voice in this video to generate synthesized audio. I confirm I have the rights to use this voice.
+          </span>
+        </label>
       </div>
 
+      {/* Languages List */}
       <div className="space-y-2">
         {Object.entries(CLONE_LANGS).map(([code, name]) => {
           const clone = clones[code] || { status: "not_started" };
@@ -161,7 +122,6 @@ export default function CloningPanel({
                 onClick={() => {
                   if (clone.status === "not_started" || clone.status === "failed") {
                     setExpandedLang(isExpanded ? null : code);
-                    setConsentGiven(false);
                   }
                 }}
               >

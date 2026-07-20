@@ -13,7 +13,6 @@ from services.storage_service import generate_upload_url
 router = APIRouter(prefix="/projects", tags=["cloning"])
 
 class CloneStartRequest(BaseModel):
-    voice_sample_id: str
     consent_given: bool
 @router.post("/{project_id}/clone/{lang}")
 async def start_voice_clone(project_id: str, lang: str, req: CloneStartRequest, background_tasks: BackgroundTasks, user: dict = Depends(get_current_user)):
@@ -34,14 +33,12 @@ async def start_voice_clone(project_id: str, lang: str, req: CloneStartRequest, 
     if clone_res.data:
         clone_id = clone_res.data[0]["id"]
         sb.table("voice_clones").update({
-            "voice_sample_id": req.voice_sample_id,
             "status": "cloning",
             "consent_given_at": "now()"
         }).eq("id", clone_id).execute()
     else:
         new_clone = sb.table("voice_clones").insert({
             "project_id": project_id,
-            "voice_sample_id": req.voice_sample_id,
             "language": lang,
             "status": "cloning",
             "consent_given_at": "now()"
@@ -49,7 +46,7 @@ async def start_voice_clone(project_id: str, lang: str, req: CloneStartRequest, 
         clone_id = new_clone.data[0]["id"]
         
     # Start background task to process
-    background_tasks.add_task(process_voice_clone, clone_id, project_id, lang, user["id"], req.voice_sample_id)
+    background_tasks.add_task(process_voice_clone, clone_id, project_id, lang, user["id"])
     
     return {"status": "cloning", "clone_id": clone_id}
 
@@ -89,77 +86,101 @@ async def process_voice_clone(clone_id: str, project_id: str, lang: str, user_id
         if not segments:
             raise Exception("Transcript has no segments.")
             
-        # 2. Fetch voice sample URL
-        sample_res = sb.table("voice_samples").select("storage_url").eq("id", voice_sample_id).execute()
-        if not sample_res.data:
-            raise Exception("Voice sample not found.")
+        # 2. Fetch project video URL
+        project_res = sb.table("projects").select("video_url").eq("id", project_id).execute()
+        if not project_res.data or not project_res.data[0].get("video_url"):
+            raise Exception("Project video not found.")
             
-        sample_url = sample_res.data[0]["storage_url"]
+        video_url = project_res.data[0]["video_url"]
         
-        # 3. Download sample and create voice
-        async with httpx.AsyncClient() as client:
-            resp = await client.get(sample_url)
+        # 3. Download video and extract 15s audio snippet
+        import subprocess
+        ffmpeg_exe = imageio_ffmpeg.get_ffmpeg_exe()
+        
+        async with httpx.AsyncClient(timeout=300) as client:
+            resp = await client.get(video_url)
             resp.raise_for_status()
-            sample_bytes = resp.content
+            video_bytes = resp.content
             
-        # create_voice expects a file path or file-like object in some SDKs, but the prompt says 
-        # `create_voice(file=sample_file, consent_given=True)`. We'll write it to a temp file.
-        temp_sample_path = f"/tmp/{uuid.uuid4()}.wav"
-        os.makedirs("/tmp", exist_ok=True)
-        with open(temp_sample_path, "wb") as f:
-            f.write(sample_bytes)
+        temp_dir = f"/tmp/{uuid.uuid4()}"
+        os.makedirs(temp_dir, exist_ok=True)
+        
+        orig_video_path = f"{temp_dir}/orig.mp4"
+        with open(orig_video_path, "wb") as f:
+            f.write(video_bytes)
             
-        # Get voice ID
-        try:
-            sarvam_voice_id = create_voice(temp_sample_path, consent_given=True)
-        finally:
-            if os.path.exists(temp_sample_path):
-                os.remove(temp_sample_path)
+        temp_sample_path = f"{temp_dir}/sample.wav"
+        # Extract first 15 seconds of audio for cloning
+        subprocess.run([
+            ffmpeg_exe, "-y", "-i", orig_video_path, 
+            "-t", "15", "-vn", "-acodec", "pcm_s16le", "-ar", "16000", "-ac", "1", 
+            temp_sample_path
+        ], check=True, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+            
+        # Get voice ID from Sarvam
+        sarvam_voice_id = create_voice(temp_sample_path, consent_given=True)
         
         # 4. Generate audio per segment and stitch
         sarvam_lang = LANG_MAP.get(lang, "hi-IN")
         
-        # Find total duration needed
         last_segment_end = max([s.get("end", 0.0) for s in segments])
-        # Add 5 seconds buffer to the end
         total_duration_ms = int((last_segment_end + 5.0) * 1000)
         
         final_audio = AudioSegment.silent(duration=total_duration_ms)
         
         for seg in segments:
             text = seg.get("text", "").strip()
-            if not text:
-                continue
+            if not text: continue
                 
             start_ms = int(seg.get("start", 0.0) * 1000)
             
-            # Generate audio bytes
-            audio_bytes = generate_dubbed_segment(text, sarvam_lang, sarvam_voice_id)
-            
-            # Load into pydub
-            seg_audio = AudioSegment.from_file(BytesIO(audio_bytes))
-            
-            # Overlay at the correct timestamp
-            final_audio = final_audio.overlay(seg_audio, position=start_ms)
-            
-        # 5. Export stitched audio and upload
-        out_buf = BytesIO()
-        final_audio.export(out_buf, format="wav")
-        out_buf.seek(0)
+            try:
+                audio_bytes = generate_dubbed_segment(text, sarvam_lang, sarvam_voice_id)
+                seg_audio = AudioSegment.from_file(BytesIO(audio_bytes))
+                final_audio = final_audio.overlay(seg_audio, position=start_ms)
+            except Exception as e:
+                print(f"Failed to generate dub for segment: {e}")
+                
+        dubbed_audio_path = f"{temp_dir}/dubbed.wav"
+        final_audio.export(dubbed_audio_path, format="wav")
         
-        object_name = f"clones/{project_id}/{lang}_{uuid.uuid4()}.wav"
-        from services.storage_service import upload_fileobj
-        upload_fileobj(object_name, out_buf, "audio/wav")
-        url = f"{os.getenv('R2_ENDPOINT')}/{os.getenv('R2_BUCKET_NAME')}/{object_name}"
+        # 5. Mux the dubbed audio back into the video, replacing original audio
+        dubbed_video_path = f"{temp_dir}/dubbed.mp4"
+        subprocess.run([
+            ffmpeg_exe, "-y", 
+            "-i", orig_video_path, 
+            "-i", dubbed_audio_path,
+            "-c:v", "copy", 
+            "-c:a", "aac", 
+            "-map", "0:v:0", 
+            "-map", "1:a:0", 
+            "-shortest", 
+            dubbed_video_path
+        ], check=True, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
         
+        # 6. Upload final video to R2
+        with open(dubbed_video_path, "rb") as f:
+            final_video_bytes = f.read()
+            
+        r2_key = f"{user_id}/{project_id}/dubbed_{lang}_{uuid.uuid4().hex[:8]}.mp4"
+        final_video_url = upload_file_to_r2(final_video_bytes, r2_key, "video/mp4")
+        
+        # Clean up temp files
+        import shutil
+        shutil.rmtree(temp_dir, ignore_errors=True)
+        
+        # 7. Update database
         sb.table("voice_clones").update({
             "status": "ready",
-            "ready_audio_url": url,
-            "sarvam_voice_id": sarvam_voice_id
+            "audio_url": final_video_url, # saving here so UI can play it as audio track if needed
+            "dubbed_video_url": final_video_url
         }).eq("id", clone_id).execute()
-
+        
     except Exception as e:
-        print(f"Cloning failed: {e}")
+        print(f"Clone process failed: {str(e)}")
+        import traceback
+        traceback.print_exc()
+        sb = get_supabase()
         sb.table("voice_clones").update({
             "status": "failed",
             "error_message": str(e)

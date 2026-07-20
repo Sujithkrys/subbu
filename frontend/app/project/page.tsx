@@ -470,7 +470,7 @@ function EditorContent() {
             ) : project?.video_download_url ? (
               <video 
                 ref={videoRef}
-                src={project.video_download_url} 
+                src={(activeCloneLang && clones[activeCloneLang]?.dubbed_video_url) ? clones[activeCloneLang].dubbed_video_url : project.video_download_url} 
                 className="absolute inset-0 w-full h-full object-contain"
                 onTimeUpdate={handleTimeUpdate}
                 onClick={togglePlay}
