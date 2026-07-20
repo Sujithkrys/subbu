@@ -10,8 +10,7 @@ from dotenv import load_dotenv
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from routers import projects, transcribe, translate, cloning, style, export, status, voice_samples
-from workers import transcribe_worker, translate_worker, render_worker
+
 
 load_dotenv()
 
