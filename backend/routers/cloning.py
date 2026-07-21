@@ -126,7 +126,6 @@ async def process_voice_clone(clone_id: str, project_id: str, lang: str, user_id
                 # Save base transcript
                 sb.table("transcripts").insert({
                     "project_id": project_id,
-                    "user_id": user_id,
                     "language": "en", # default assumption for auto-transcribe
                     "segments": base_segments,
                     "source": "groq-whisper"
@@ -139,7 +138,6 @@ async def process_voice_clone(clone_id: str, project_id: str, lang: str, user_id
             # Save the newly translated transcript
             sb.table("transcripts").insert({
                 "project_id": project_id,
-                "user_id": user_id,
                 "language": lang,
                 "segments": segments,
                 "source": "gemini-translate"
