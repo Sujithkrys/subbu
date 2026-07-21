@@ -1,6 +1,6 @@
 import os
 import uuid
-from typing import List, Dict, Any
+from typing import List, Dict, Any, Optional
 from fastapi import APIRouter, HTTPException, Depends, UploadFile, File, BackgroundTasks
 from pydantic import BaseModel
 import httpx
@@ -14,7 +14,7 @@ router = APIRouter(tags=["cloning"])
 
 class CloneStartRequest(BaseModel):
     consent_given: bool
-    speaker: str = None
+    speaker: Optional[str] = None
 @router.post("/{project_id}/clone/{lang}")
 async def start_voice_clone(project_id: str, lang: str, req: CloneStartRequest, background_tasks: BackgroundTasks, user: dict = Depends(get_current_user)):
     """Start the voice cloning process."""
@@ -76,6 +76,7 @@ async def process_voice_clone(clone_id: str, project_id: str, lang: str, user_id
         
         from services.sarvam_service import generate_dubbed_segment, DEFAULT_SPEAKER
         from services.storage_service import upload_file, generate_download_url
+        from services import elevenlabs_service
         
         # 1. Fetch project video URL
         project_res = sb.table("projects").select("video_url").eq("id", project_id).execute()
@@ -149,17 +150,18 @@ async def process_voice_clone(clone_id: str, project_id: str, lang: str, user_id
         
         # 4. Extract snippet from original video for cloning
         snippet_path = f"{temp_dir}/snippet.wav"
-        subprocess.run([
-            ffmpeg_exe, "-y", "-i", orig_video_path,
-            "-t", "15", "-ac", "1", "-ar", "22050", snippet_path
-        ], check=True, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
-        
+        cloned_voice_id = None
         try:
+            subprocess.run([
+                ffmpeg_exe, "-y", "-i", orig_video_path,
+                "-t", "15", "-ac", "1", "-ar", "22050", snippet_path
+            ], check=True, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+            
             cloned_voice_id = elevenlabs_service.clone_voice(f"Clone_{project_id[:8]}", "User Voice Clone", snippet_path)
             print(f"ElevenLabs cloned voice ID: {cloned_voice_id}")
         except Exception as e:
-            print(f"ElevenLabs clone failed: {e}")
-            # Fallback to Sarvam if ElevenLabs fails (e.g., no API key)
+            print(f"ElevenLabs clone or extraction failed: {e}")
+            # Fallback to Sarvam if ElevenLabs fails (e.g., no API key or ffmpeg error)
             cloned_voice_id = None
         
         last_segment_end = max([s.get("end", 0.0) for s in segments])

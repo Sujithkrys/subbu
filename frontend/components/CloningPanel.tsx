@@ -218,13 +218,13 @@ export default function CloningPanel({
                     
                     {openSpeakerDropdown === code && (
                       <div 
-                        className="absolute z-50 w-full mt-1 rounded-lg border shadow-xl overflow-hidden flex flex-col bg-white dark:bg-[#1E1E1E]"
+                        className="absolute z-50 w-full mt-1 rounded-lg border shadow-xl flex flex-col bg-white dark:bg-[#1E1E1E]"
                         style={{ 
                           borderColor: "var(--color-border-theme)",
-                          maxHeight: "180px"
+                          maxHeight: "220px"
                         }}
                       >
-                        <div className="overflow-y-auto p-1 custom-scrollbar bg-white dark:bg-[#1E1E1E]">
+                        <div className="overflow-y-auto p-1 custom-scrollbar bg-white dark:bg-[#1E1E1E] rounded-lg">
                           {SPEAKER_OPTIONS.map((group, i) => (
                             <div key={i} className="mb-1 last:mb-0">
                               <div className="px-2 py-1 text-[9px] font-bold uppercase tracking-wider opacity-60" style={{ color: "var(--color-text-secondary)" }}>
@@ -233,21 +233,34 @@ export default function CloningPanel({
                               {group.options.map(opt => {
                                 const isSelected = (selectedSpeakers[code] || "anushka") === opt.id;
                                 return (
-                                  <button
-                                    key={opt.id}
-                                    onClick={() => {
-                                      setSelectedSpeakers({ ...selectedSpeakers, [code]: opt.id });
-                                      setOpenSpeakerDropdown(null);
-                                    }}
-                                    className="w-full text-left px-2 py-1.5 text-xs rounded transition-colors hover:bg-black/5 dark:hover:bg-white/10 flex items-center justify-between group"
-                                    style={{ 
-                                      color: isSelected ? "var(--color-accent)" : "var(--color-text-primary)",
-                                      fontWeight: isSelected ? 600 : 400
-                                    }}
-                                  >
-                                    {opt.name}
-                                    {isSelected && <Check size={12} className="opacity-100" />}
-                                  </button>
+                                  <div key={opt.id} className="flex items-center justify-between group hover:bg-black/5 dark:hover:bg-white/10 rounded transition-colors px-1">
+                                    <button
+                                      onClick={(e) => {
+                                        e.stopPropagation();
+                                        setSelectedSpeakers({ ...selectedSpeakers, [code]: opt.id });
+                                        setOpenSpeakerDropdown(null);
+                                      }}
+                                      className="flex-1 text-left px-2 py-1.5 text-xs flex items-center justify-between"
+                                      style={{ 
+                                        color: isSelected ? "var(--color-accent)" : "var(--color-text-primary)",
+                                        fontWeight: isSelected ? 600 : 400
+                                      }}
+                                    >
+                                      {opt.name}
+                                      {isSelected && <Check size={12} className="opacity-100" />}
+                                    </button>
+                                    <button
+                                      onClick={(e) => {
+                                        e.stopPropagation();
+                                        const audio = new Audio(`https://subbu-5j7u.onrender.com/preview-voice?speaker=${opt.id}&lang=${code}`);
+                                        audio.play();
+                                      }}
+                                      className="p-1.5 rounded hover:bg-black/10 dark:hover:bg-white/20 transition-colors"
+                                      title="Preview Voice"
+                                    >
+                                      <Play size={12} style={{ color: "var(--color-accent)" }} />
+                                    </button>
+                                  </div>
                                 );
                               })}
                             </div>
