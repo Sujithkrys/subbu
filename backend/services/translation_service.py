@@ -41,7 +41,7 @@ async def translate_batch(texts: list[str], target_language: str) -> list[str]:
     Includes basic retry logic with backoff for 429 rate-limit errors.
     """
     # Initialize the specific model version requested
-    model = genai.GenerativeModel("gemini-3-flash")
+    model = genai.GenerativeModel("gemini-1.5-flash")
     
     # We use a unique delimiter to batch multiple segments into a single prompt
     delimiter = "\n\n|||\n\n"
