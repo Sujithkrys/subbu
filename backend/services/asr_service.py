@@ -74,9 +74,9 @@ def transcribe_audio(
     segments = []
     if hasattr(transcription, "segments") and transcription.segments:
         for seg in transcription.segments:
-            start = round(seg.get("start", seg.start) if isinstance(seg, dict) else seg.start, 3)
-            end = round(seg.get("end", seg.end) if isinstance(seg, dict) else seg.end, 3)
-            text = (seg.get("text", "") if isinstance(seg, dict) else seg.text).strip()
+            start = round(seg.get("start", 0.0) if isinstance(seg, dict) else getattr(seg, "start", 0.0), 3)
+            end = round(seg.get("end", 0.0) if isinstance(seg, dict) else getattr(seg, "end", 0.0), 3)
+            text = (seg.get("text", "") if isinstance(seg, dict) else getattr(seg, "text", "")).strip()
 
             segment_obj: dict = {"start": start, "end": end, "text": text}
 
