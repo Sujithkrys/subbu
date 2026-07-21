@@ -197,8 +197,9 @@ export default function CloningPanel({
                     <label className="block text-[10px] mb-1 font-medium" style={{ color: "var(--color-text-secondary)" }}>Speaker Voice (Gender Match)</label>
                     <button 
                       onClick={() => setOpenSpeakerDropdown(openSpeakerDropdown === code ? null : code)}
-                      className="w-full text-xs rounded-lg p-2 border flex items-center justify-between transition-colors focus:outline-none focus:ring-1 focus:ring-purple-500 bg-white dark:bg-[#1E1E1E]"
+                      className="w-full text-xs rounded-lg p-2 border flex items-center justify-between transition-colors focus:outline-none focus:ring-1 focus:ring-purple-500"
                       style={{ 
+                        backgroundColor: "var(--color-card)",
                         borderColor: "var(--color-border-theme)", 
                         color: "var(--color-text-primary)" 
                       }}
@@ -218,13 +219,14 @@ export default function CloningPanel({
                     
                     {openSpeakerDropdown === code && (
                       <div 
-                        className="absolute z-50 w-full mt-1 rounded-lg border shadow-xl flex flex-col bg-white dark:bg-[#1E1E1E]"
+                        className="absolute z-50 w-full mt-1 rounded-lg border shadow-xl flex flex-col"
                         style={{ 
+                          backgroundColor: "var(--color-card)",
                           borderColor: "var(--color-border-theme)",
                           maxHeight: "220px"
                         }}
                       >
-                        <div className="overflow-y-auto p-1 custom-scrollbar bg-white dark:bg-[#1E1E1E] rounded-lg">
+                        <div className="overflow-y-auto p-1 custom-scrollbar rounded-lg">
                           {SPEAKER_OPTIONS.map((group, i) => (
                             <div key={i} className="mb-1 last:mb-0">
                               <div className="px-2 py-1 text-[9px] font-bold uppercase tracking-wider opacity-60" style={{ color: "var(--color-text-secondary)" }}>
