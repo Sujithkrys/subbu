@@ -133,7 +133,7 @@ async def process_voice_clone(clone_id: str, project_id: str, lang: str, user_id
             
             # Now we have base_segments. Let's translate to the target language!
             from services.translation_service import translate_segments
-            segments = await translate_segments(base_segments, lang)
+            segments = await translate_segments(base_segments, "en", lang)
             
             # Save the newly translated transcript
             sb.table("transcripts").insert({
@@ -155,7 +155,8 @@ async def process_voice_clone(clone_id: str, project_id: str, lang: str, user_id
         ], check=True, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
             
         # Get voice ID from Sarvam
-        sarvam_voice_id = create_voice(temp_sample_path, consent_given=True)
+        with open(temp_sample_path, "rb") as sample_f:
+            sarvam_voice_id = create_voice(sample_f, consent_given=True)
         
         # 4. Generate audio per segment and stitch
         sarvam_lang = LANG_MAP.get(lang, "hi-IN")
@@ -173,7 +174,7 @@ async def process_voice_clone(clone_id: str, project_id: str, lang: str, user_id
             
             try:
                 audio_bytes = generate_dubbed_segment(text, sarvam_lang, sarvam_voice_id)
-                seg_audio = AudioSegment.from_file(BytesIO(audio_bytes))
+                seg_audio = AudioSegment.from_file(BytesIO(audio_bytes), format="wav")
                 final_audio = final_audio.overlay(seg_audio, position=start_ms)
             except Exception as e:
                 print(f"Failed to generate dub for segment: {e}")
