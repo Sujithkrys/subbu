@@ -469,6 +469,7 @@ function EditorContent() {
               </div>
             ) : project?.video_download_url ? (
               <video 
+                key={(activeCloneLang && clones[activeCloneLang]?.dubbed_video_url) ? clones[activeCloneLang].dubbed_video_url : project.video_download_url}
                 ref={videoRef}
                 src={(activeCloneLang && clones[activeCloneLang]?.dubbed_video_url) ? clones[activeCloneLang].dubbed_video_url : project.video_download_url} 
                 className="absolute inset-0 w-full h-full object-contain"
