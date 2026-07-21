@@ -18,7 +18,7 @@ import type {
   DashboardMetricsResponse,
 } from "./types";
 
-const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
+export const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
 
 async function getAuthHeaders(): Promise<Record<string, string>> {
   const supabase = createClient();
