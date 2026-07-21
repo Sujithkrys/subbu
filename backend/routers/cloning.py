@@ -81,7 +81,8 @@ async def process_voice_clone(clone_id: str, project_id: str, lang: str, user_id
         if not project_res.data or not project_res.data[0].get("video_url"):
             raise Exception("Project video not found.")
             
-        video_url = project_res.data[0]["video_url"]
+        video_key = project_res.data[0]["video_url"]
+        video_url = generate_download_url(video_key)
         
         # 2. Download video
         import subprocess
