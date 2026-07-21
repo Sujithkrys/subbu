@@ -23,17 +23,14 @@ type VoiceSample = { id: string; storage_url: string; label: string };
 const SPEAKER_OPTIONS = [
   { group: "Male Voices", options: [
       { id: "abhilash", name: "Abhilash (Male)" },
-      { id: "aditya", name: "Aditya (Male)" },
-      { id: "hitesh", name: "Hitesh (Male)" },
-      { id: "rahul", name: "Rahul (Male)" },
-      { id: "rohan", name: "Rohan (Male)" }
+      { id: "arya", name: "Arya (Male)" },
+      { id: "karun", name: "Karun (Male)" },
+      { id: "hitesh", name: "Hitesh (Male)" }
   ]},
   { group: "Female Voices", options: [
       { id: "anushka", name: "Anushka (Female)" },
       { id: "manisha", name: "Manisha (Female)" },
-      { id: "vidya", name: "Vidya (Female)" },
-      { id: "ritu", name: "Ritu (Female)" },
-      { id: "priya", name: "Priya (Female)" }
+      { id: "vidya", name: "Vidya (Female)" }
   ]}
 ];
 
