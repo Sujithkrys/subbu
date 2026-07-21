@@ -180,8 +180,13 @@ async def process_voice_clone(clone_id: str, project_id: str, lang: str, user_id
             
             try:
                 if cloned_voice_id:
-                    audio_bytes = elevenlabs_service.generate_dubbed_segment(text, cloned_voice_id)
-                    seg_audio = AudioSegment.from_file(BytesIO(audio_bytes), format="mp3")
+                    try:
+                        audio_bytes = elevenlabs_service.generate_dubbed_segment(text, cloned_voice_id)
+                        seg_audio = AudioSegment.from_file(BytesIO(audio_bytes), format="mp3")
+                    except Exception as e:
+                        print(f"ElevenLabs segment generation failed ({e}), falling back to Sarvam.")
+                        audio_bytes = generate_dubbed_segment(text, sarvam_lang, fallback_speaker)
+                        seg_audio = AudioSegment.from_file(BytesIO(audio_bytes), format="wav")
                 else:
                     audio_bytes = generate_dubbed_segment(text, sarvam_lang, fallback_speaker)
                     seg_audio = AudioSegment.from_file(BytesIO(audio_bytes), format="wav")
@@ -189,6 +194,7 @@ async def process_voice_clone(clone_id: str, project_id: str, lang: str, user_id
                 final_audio = final_audio.overlay(seg_audio, position=start_ms)
             except Exception as e:
                 print(f"Failed to generate dub for segment: {e}")
+                raise Exception(f"Audio generation completely failed: {e}")
                 
         dubbed_audio_path = f"{temp_dir}/dubbed.wav"
         final_audio.export(dubbed_audio_path, format="wav")
