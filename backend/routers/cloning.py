@@ -52,7 +52,7 @@ async def start_voice_clone(project_id: str, lang: str, req: CloneStartRequest, 
     return {"status": "cloning", "clone_id": clone_id}
 
 
-async def process_voice_clone(clone_id: str, project_id: str, lang: str, user_id: str, voice_sample_id: str):
+async def process_voice_clone(clone_id: str, project_id: str, lang: str, user_id: str):
     """Background task to interact with Sarvam API"""
     sb = get_supabase()
     
