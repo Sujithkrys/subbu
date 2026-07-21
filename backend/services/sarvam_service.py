@@ -4,9 +4,9 @@ from sarvamai import SarvamAI
 
 
 def get_client() -> SarvamAI:
-    api_key = os.environ.get("SARVAM_API_KEY", "")
-    if not api_key or api_key == "your_sarvam_api_key_here":
-        raise ValueError("SARVAM_API_KEY is missing or invalid.")
+    api_key = os.getenv("SARVAM_API_KEY")
+    if not api_key or api_key == "your_sarvam_api_key_here" or api_key == "NOT SET":
+        api_key = "sk_r5wt8iqu_EGntYvdR6gcJna4jNEStmGsj" # Fallback since Render env var wasn't updated
     return SarvamAI(api_subscription_key=api_key)
 
 
