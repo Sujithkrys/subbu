@@ -12,3 +12,4 @@ google-generativeai
 sarvamai==0.1.0
 pydub==0.25.1
 imageio-ffmpeg==0.5.1
+audioop-lts==0.2.2
