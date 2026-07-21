@@ -129,7 +129,7 @@ async def process_voice_clone(clone_id: str, project_id: str, lang: str, user_id
                     "user_id": user_id,
                     "language": "en", # default assumption for auto-transcribe
                     "segments": base_segments,
-                    "is_original": True
+                    "source": "groq-whisper"
                 }).execute()
             
             # Now we have base_segments. Let's translate to the target language!
@@ -142,7 +142,7 @@ async def process_voice_clone(clone_id: str, project_id: str, lang: str, user_id
                 "user_id": user_id,
                 "language": lang,
                 "segments": segments,
-                "is_original": False
+                "source": "gemini-translate"
             }).execute()
 
         if not segments:
