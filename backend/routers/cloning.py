@@ -30,18 +30,19 @@ async def start_voice_clone(project_id: str, lang: str, req: CloneStartRequest, 
     # Get or create clone record
     clone_res = sb.table("voice_clones").select("*").eq("project_id", project_id).eq("language", lang).execute()
     
+    import datetime
     if clone_res.data:
         clone_id = clone_res.data[0]["id"]
         sb.table("voice_clones").update({
             "status": "cloning",
-            "consent_given_at": "now()"
+            "consent_given_at": datetime.datetime.utcnow().isoformat()
         }).eq("id", clone_id).execute()
     else:
         new_clone = sb.table("voice_clones").insert({
             "project_id": project_id,
             "language": lang,
             "status": "cloning",
-            "consent_given_at": "now()"
+            "consent_given_at": datetime.datetime.utcnow().isoformat()
         }).execute()
         clone_id = new_clone.data[0]["id"]
         
