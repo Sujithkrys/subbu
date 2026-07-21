@@ -173,7 +173,7 @@ export default function CloningPanel({
                   
                   <button 
                     onClick={() => handleCloneStart(code)}
-                    disabled={!consentGiven || !selectedSampleId}
+                    disabled={!consentGiven}
                     className="w-full rounded-lg py-2 text-xs font-medium transition-opacity disabled:opacity-50"
                     style={{ background: "var(--color-accent)", color: "white" }}
                   >
