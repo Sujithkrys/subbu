@@ -20,13 +20,32 @@ const CLONE_LANGS: Record<string, string> = {
 
 type VoiceSample = { id: string; storage_url: string; label: string };
 
+const SPEAKER_OPTIONS = [
+  { group: "Male Voices", options: [
+      { id: "abhilash", name: "Abhilash (Male)" },
+      { id: "aditya", name: "Aditya (Male)" },
+      { id: "hitesh", name: "Hitesh (Male)" },
+      { id: "rahul", name: "Rahul (Male)" },
+      { id: "rohan", name: "Rohan (Male)" }
+  ]},
+  { group: "Female Voices", options: [
+      { id: "anushka", name: "Anushka (Female)" },
+      { id: "manisha", name: "Manisha (Female)" },
+      { id: "vidya", name: "Vidya (Female)" },
+      { id: "ritu", name: "Ritu (Female)" },
+      { id: "priya", name: "Priya (Female)" }
+  ]}
+];
+
 export default function CloningPanel({
   projectId,
+  hasVoiceSample, // unused now but kept for backwards compat with parent if needed
+  onSampleUploaded,
   onPreviewChange,
   onClonesChange
 }: {
   projectId: string;
-  hasVoiceSample: boolean; // unused now but kept for backwards compat with parent if needed
+  hasVoiceSample: boolean;
   onSampleUploaded: () => void;
   onPreviewChange: (lang: string | null) => void;
   onClonesChange: (clones: Record<string, any>) => void;
@@ -35,6 +54,7 @@ export default function CloningPanel({
   const [expandedLang, setExpandedLang] = useState<string | null>(null);
   const [consentGiven, setConsentGiven] = useState(false);
   const [selectedSpeakers, setSelectedSpeakers] = useState<Record<string, string>>({});
+  const [openSpeakerDropdown, setOpenSpeakerDropdown] = useState<string | null>(null);
   
   useEffect(() => {
     fetchClones();
@@ -173,29 +193,70 @@ export default function CloningPanel({
                     </span>
                   </label>
                   
-                  <div className="mb-3">
+                  <div className="mb-3 relative">
                     <label className="block text-[10px] mb-1 font-medium" style={{ color: "var(--color-text-secondary)" }}>Speaker Voice (Gender Match)</label>
-                    <select 
-                      value={selectedSpeakers[code] || "anushka"}
-                      onChange={(e) => setSelectedSpeakers({ ...selectedSpeakers, [code]: e.target.value })}
-                      className="w-full text-xs rounded-lg p-2 bg-transparent border appearance-none outline-none focus:ring-1 focus:ring-purple-500"
-                      style={{ borderColor: "var(--color-border-theme)", color: "var(--color-text-primary)" }}
+                    <button 
+                      onClick={() => setOpenSpeakerDropdown(openSpeakerDropdown === code ? null : code)}
+                      className="w-full text-xs rounded-lg p-2 border flex items-center justify-between transition-colors focus:outline-none focus:ring-1 focus:ring-purple-500"
+                      style={{ 
+                        backgroundColor: "var(--color-bg-elevated)", 
+                        borderColor: "var(--color-border-theme)", 
+                        color: "var(--color-text-primary)" 
+                      }}
                     >
-                      <optgroup label="Male Voices">
-                        <option value="abhilash">Abhilash (Male)</option>
-                        <option value="aditya">Aditya (Male)</option>
-                        <option value="hitesh">Hitesh (Male)</option>
-                        <option value="rahul">Rahul (Male)</option>
-                        <option value="rohan">Rohan (Male)</option>
-                      </optgroup>
-                      <optgroup label="Female Voices">
-                        <option value="anushka">Anushka (Female)</option>
-                        <option value="manisha">Manisha (Female)</option>
-                        <option value="vidya">Vidya (Female)</option>
-                        <option value="ritu">Ritu (Female)</option>
-                        <option value="priya">Priya (Female)</option>
-                      </optgroup>
-                    </select>
+                      <span className="truncate">
+                        {(() => {
+                          const val = selectedSpeakers[code] || "anushka";
+                          for (const group of SPEAKER_OPTIONS) {
+                            const opt = group.options.find(o => o.id === val);
+                            if (opt) return opt.name;
+                          }
+                          return val;
+                        })()}
+                      </span>
+                      <ChevronDown size={14} style={{ color: "var(--color-text-secondary)" }} className={`transition-transform duration-200 ${openSpeakerDropdown === code ? 'rotate-180' : ''}`} />
+                    </button>
+                    
+                    {openSpeakerDropdown === code && (
+                      <div 
+                        className="absolute z-10 w-full mt-1 rounded-lg border shadow-lg overflow-hidden flex flex-col"
+                        style={{ 
+                          backgroundColor: "var(--color-bg-elevated)", 
+                          borderColor: "var(--color-border-theme)",
+                          maxHeight: "180px"
+                        }}
+                      >
+                        <div className="overflow-y-auto p-1 custom-scrollbar">
+                          {SPEAKER_OPTIONS.map((group, i) => (
+                            <div key={i} className="mb-1 last:mb-0">
+                              <div className="px-2 py-1 text-[9px] font-bold uppercase tracking-wider opacity-60" style={{ color: "var(--color-text-secondary)" }}>
+                                {group.group}
+                              </div>
+                              {group.options.map(opt => {
+                                const isSelected = (selectedSpeakers[code] || "anushka") === opt.id;
+                                return (
+                                  <button
+                                    key={opt.id}
+                                    onClick={() => {
+                                      setSelectedSpeakers({ ...selectedSpeakers, [code]: opt.id });
+                                      setOpenSpeakerDropdown(null);
+                                    }}
+                                    className="w-full text-left px-2 py-1.5 text-xs rounded transition-colors hover:bg-black/5 dark:hover:bg-white/10 flex items-center justify-between group"
+                                    style={{ 
+                                      color: isSelected ? "var(--color-accent)" : "var(--color-text-primary)",
+                                      fontWeight: isSelected ? 600 : 400
+                                    }}
+                                  >
+                                    {opt.name}
+                                    {isSelected && <Check size={12} className="opacity-100" />}
+                                  </button>
+                                );
+                              })}
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
                   </div>
                   
                   <button 
