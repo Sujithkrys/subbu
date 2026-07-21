@@ -73,7 +73,7 @@ async def process_voice_clone(clone_id: str, project_id: str, lang: str, user_id
         # Configure pydub to use the bundled ffmpeg binary
         AudioSegment.converter = imageio_ffmpeg.get_ffmpeg_exe()
         
-        from services.sarvam_service import create_voice, generate_dubbed_segment
+        from services.sarvam_service import generate_dubbed_segment, DEFAULT_SPEAKER
         from services.storage_service import upload_file, generate_download_url
         
         # 1. Fetch project video URL
@@ -146,20 +146,9 @@ async def process_voice_clone(clone_id: str, project_id: str, lang: str, user_id
         if not segments:
             raise Exception("Transcript has no segments.")
         
-        temp_sample_path = f"{temp_dir}/sample.wav"
-        # 4. Extract first 15 seconds of audio for cloning
-        subprocess.run([
-            ffmpeg_exe, "-y", "-i", orig_video_path, 
-            "-t", "15", "-vn", "-acodec", "pcm_s16le", "-ar", "16000", "-ac", "1", 
-            temp_sample_path
-        ], check=True, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
-            
-        # Get voice ID from Sarvam
-        with open(temp_sample_path, "rb") as sample_f:
-            sarvam_voice_id = create_voice(sample_f, consent_given=True)
-        
-        # 4. Generate audio per segment and stitch
+        # 4. Generate audio per segment and stitch using pre-built Sarvam speaker
         sarvam_lang = LANG_MAP.get(lang, "hi-IN")
+        speaker = DEFAULT_SPEAKER
         
         last_segment_end = max([s.get("end", 0.0) for s in segments])
         total_duration_ms = int((last_segment_end + 5.0) * 1000)
@@ -173,7 +162,7 @@ async def process_voice_clone(clone_id: str, project_id: str, lang: str, user_id
             start_ms = int(seg.get("start", 0.0) * 1000)
             
             try:
-                audio_bytes = generate_dubbed_segment(text, sarvam_lang, sarvam_voice_id)
+                audio_bytes = generate_dubbed_segment(text, sarvam_lang, speaker)
                 seg_audio = AudioSegment.from_file(BytesIO(audio_bytes), format="wav")
                 final_audio = final_audio.overlay(seg_audio, position=start_ms)
             except Exception as e:
