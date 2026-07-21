@@ -10,7 +10,7 @@ from services.auth_service import get_current_user
 from db.supabase_client import get_supabase
 from services.storage_service import generate_upload_url
 
-router = APIRouter(prefix="/projects", tags=["cloning"])
+router = APIRouter(tags=["cloning"])
 
 class CloneStartRequest(BaseModel):
     consent_given: bool
