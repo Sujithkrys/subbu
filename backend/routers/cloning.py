@@ -14,6 +14,7 @@ router = APIRouter(tags=["cloning"])
 
 class CloneStartRequest(BaseModel):
     consent_given: bool
+    speaker: str = None
 @router.post("/{project_id}/clone/{lang}")
 async def start_voice_clone(project_id: str, lang: str, req: CloneStartRequest, background_tasks: BackgroundTasks, user: dict = Depends(get_current_user)):
     """Start the voice cloning process."""
@@ -47,12 +48,12 @@ async def start_voice_clone(project_id: str, lang: str, req: CloneStartRequest, 
         clone_id = new_clone.data[0]["id"]
         
     # Start background task to process
-    background_tasks.add_task(process_voice_clone, clone_id, project_id, lang, user["id"])
+    background_tasks.add_task(process_voice_clone, clone_id, project_id, lang, user["id"], req.speaker)
     
     return {"status": "cloning", "clone_id": clone_id}
 
 
-async def process_voice_clone(clone_id: str, project_id: str, lang: str, user_id: str):
+async def process_voice_clone(clone_id: str, project_id: str, lang: str, user_id: str, speaker: str = None):
     """Background task to interact with Sarvam API"""
     sb = get_supabase()
     
@@ -148,7 +149,7 @@ async def process_voice_clone(clone_id: str, project_id: str, lang: str, user_id
         
         # 4. Generate audio per segment and stitch using pre-built Sarvam speaker
         sarvam_lang = LANG_MAP.get(lang, "hi-IN")
-        speaker = DEFAULT_SPEAKER
+        speaker_id = speaker or DEFAULT_SPEAKER
         
         last_segment_end = max([s.get("end", 0.0) for s in segments])
         total_duration_ms = int((last_segment_end + 5.0) * 1000)
@@ -162,7 +163,7 @@ async def process_voice_clone(clone_id: str, project_id: str, lang: str, user_id
             start_ms = int(seg.get("start", 0.0) * 1000)
             
             try:
-                audio_bytes = generate_dubbed_segment(text, sarvam_lang, speaker)
+                audio_bytes = generate_dubbed_segment(text, sarvam_lang, speaker_id)
                 seg_audio = AudioSegment.from_file(BytesIO(audio_bytes), format="wav")
                 final_audio = final_audio.overlay(seg_audio, position=start_ms)
             except Exception as e:

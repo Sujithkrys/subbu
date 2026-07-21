@@ -34,6 +34,7 @@ export default function CloningPanel({
   const [clones, setClones] = useState<Record<string, any>>({});
   const [expandedLang, setExpandedLang] = useState<string | null>(null);
   const [consentGiven, setConsentGiven] = useState(false);
+  const [selectedSpeakers, setSelectedSpeakers] = useState<Record<string, string>>({});
   
   useEffect(() => {
     fetchClones();
@@ -59,7 +60,8 @@ export default function CloningPanel({
     onClonesChange(newClones);
     
     try {
-      await startCloning(projectId, lang, "auto");
+      const speaker = selectedSpeakers[lang] || "anushka";
+      await startCloning(projectId, lang, speaker);
       pollStatus(lang);
     } catch (err) {
       console.error(err);
@@ -167,9 +169,34 @@ export default function CloningPanel({
                       <Check size={10} className="absolute text-white opacity-0 peer-checked:opacity-100 pointer-events-none" />
                     </div>
                     <span className="text-[10px] leading-tight select-none" style={{ color: "var(--color-text-secondary)" }}>
-                      I consent to cloning this voice for {name} dubbing. I own this voice or have permission to clone it.
+                      I consent to generating audio for {name} dubbing using the selected speaker voice.
                     </span>
                   </label>
+                  
+                  <div className="mb-3">
+                    <label className="block text-[10px] mb-1 font-medium" style={{ color: "var(--color-text-secondary)" }}>Speaker Voice (Gender Match)</label>
+                    <select 
+                      value={selectedSpeakers[code] || "anushka"}
+                      onChange={(e) => setSelectedSpeakers({ ...selectedSpeakers, [code]: e.target.value })}
+                      className="w-full text-xs rounded-lg p-2 bg-transparent border appearance-none outline-none focus:ring-1 focus:ring-purple-500"
+                      style={{ borderColor: "var(--color-border-theme)", color: "var(--color-text-primary)" }}
+                    >
+                      <optgroup label="Male Voices">
+                        <option value="abhilash">Abhilash (Male)</option>
+                        <option value="aditya">Aditya (Male)</option>
+                        <option value="hitesh">Hitesh (Male)</option>
+                        <option value="rahul">Rahul (Male)</option>
+                        <option value="rohan">Rohan (Male)</option>
+                      </optgroup>
+                      <optgroup label="Female Voices">
+                        <option value="anushka">Anushka (Female)</option>
+                        <option value="manisha">Manisha (Female)</option>
+                        <option value="vidya">Vidya (Female)</option>
+                        <option value="ritu">Ritu (Female)</option>
+                        <option value="priya">Priya (Female)</option>
+                      </optgroup>
+                    </select>
+                  </div>
                   
                   <button 
                     onClick={() => handleCloneStart(code)}

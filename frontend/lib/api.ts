@@ -257,11 +257,11 @@ export async function uploadVoiceSample(projectId: string, file: File): Promise<
 export async function startCloning(
   projectId: string,
   lang: string,
-  _ignored_voiceSampleId: string // keep signature for compatibility but ignored
+  speaker: string = "anushka"
 ): Promise<any> {
   return apiFetch(`/projects/${projectId}/clone/${lang}`, {
     method: "POST",
-    body: JSON.stringify({ consent_given: true }),
+    body: JSON.stringify({ consent_given: true, speaker: speaker }),
   });
 }
 
