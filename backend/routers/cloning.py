@@ -196,7 +196,7 @@ async def process_voice_clone(clone_id: str, project_id: str, lang: str, user_id
         # 7. Update database
         sb.table("voice_clones").update({
             "status": "ready",
-            "audio_url": r2_key, 
+            "ready_audio_url": r2_key, 
             "dubbed_video_url": r2_key
         }).eq("id", clone_id).execute()
         
@@ -221,8 +221,8 @@ async def get_voice_clone_status(project_id: str, lang: str, user: dict = Depend
     clone = res.data[0]
     if clone.get("dubbed_video_url"):
         clone["dubbed_video_url"] = generate_download_url(clone["dubbed_video_url"])
-    if clone.get("audio_url"):
-        clone["audio_url"] = generate_download_url(clone["audio_url"])
+    if clone.get("ready_audio_url"):
+        clone["ready_audio_url"] = generate_download_url(clone["ready_audio_url"])
     return clone
 
 @router.get("/{project_id}/clones")
@@ -234,6 +234,6 @@ async def get_voice_clones(project_id: str, user: dict = Depends(get_current_use
     for clone in clones:
         if clone.get("dubbed_video_url"):
             clone["dubbed_video_url"] = generate_download_url(clone["dubbed_video_url"])
-        if clone.get("audio_url"):
-            clone["audio_url"] = generate_download_url(clone["audio_url"])
+        if clone.get("ready_audio_url"):
+            clone["ready_audio_url"] = generate_download_url(clone["ready_audio_url"])
     return clones
