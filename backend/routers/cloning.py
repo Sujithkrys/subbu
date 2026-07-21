@@ -147,14 +147,28 @@ async def process_voice_clone(clone_id: str, project_id: str, lang: str, user_id
         if not segments:
             raise Exception("Transcript has no segments.")
         
-        # 4. Generate audio per segment and stitch using pre-built Sarvam speaker
-        sarvam_lang = LANG_MAP.get(lang, "hi-IN")
-        speaker_id = speaker or DEFAULT_SPEAKER
+        # 4. Extract snippet from original video for cloning
+        snippet_path = f"{temp_dir}/snippet.wav"
+        subprocess.run([
+            ffmpeg_exe, "-y", "-i", orig_video_path,
+            "-t", "15", "-ac", "1", "-ar", "22050", snippet_path
+        ], check=True, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+        
+        try:
+            cloned_voice_id = elevenlabs_service.clone_voice(f"Clone_{project_id[:8]}", "User Voice Clone", snippet_path)
+            print(f"ElevenLabs cloned voice ID: {cloned_voice_id}")
+        except Exception as e:
+            print(f"ElevenLabs clone failed: {e}")
+            # Fallback to Sarvam if ElevenLabs fails (e.g., no API key)
+            cloned_voice_id = None
         
         last_segment_end = max([s.get("end", 0.0) for s in segments])
         total_duration_ms = int((last_segment_end + 5.0) * 1000)
         
         final_audio = AudioSegment.silent(duration=total_duration_ms)
+        
+        sarvam_lang = LANG_MAP.get(lang, "hi-IN")
+        fallback_speaker = speaker or DEFAULT_SPEAKER
         
         for seg in segments:
             text = seg.get("text", "").strip()
@@ -163,8 +177,13 @@ async def process_voice_clone(clone_id: str, project_id: str, lang: str, user_id
             start_ms = int(seg.get("start", 0.0) * 1000)
             
             try:
-                audio_bytes = generate_dubbed_segment(text, sarvam_lang, speaker_id)
-                seg_audio = AudioSegment.from_file(BytesIO(audio_bytes), format="wav")
+                if cloned_voice_id:
+                    audio_bytes = elevenlabs_service.generate_dubbed_segment(text, cloned_voice_id)
+                    seg_audio = AudioSegment.from_file(BytesIO(audio_bytes), format="mp3")
+                else:
+                    audio_bytes = generate_dubbed_segment(text, sarvam_lang, fallback_speaker)
+                    seg_audio = AudioSegment.from_file(BytesIO(audio_bytes), format="wav")
+                    
                 final_audio = final_audio.overlay(seg_audio, position=start_ms)
             except Exception as e:
                 print(f"Failed to generate dub for segment: {e}")
