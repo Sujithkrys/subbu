@@ -254,7 +254,7 @@ export default function CloningPanel({
                                     <button
                                       onClick={(e) => {
                                         e.stopPropagation();
-                                        const audio = new Audio(`${API_URL}/projects/preview-voice?speaker=${opt.id}&lang=${code}`);
+                                        const audio = new Audio(`${API_URL}/preview-voice?speaker=${opt.id}&lang=${code}`);
                                         audio.play().catch(err => console.error("Playback failed:", err));
                                       }}
                                       className="p-1.5 rounded hover:bg-black/10 dark:hover:bg-white/20 transition-colors"
