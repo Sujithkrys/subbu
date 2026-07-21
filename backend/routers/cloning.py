@@ -76,25 +76,14 @@ async def process_voice_clone(clone_id: str, project_id: str, lang: str, user_id
         from services.sarvam_service import create_voice, generate_dubbed_segment
         from services.storage_service import upload_file, generate_download_url
         
-        # 1. Fetch transcript segments
-        transcript_res = sb.table("transcripts").select("segments").eq("project_id", project_id).eq("language", lang).execute()
-        if not transcript_res.data:
-            transcript_res = sb.table("transcripts").select("segments").eq("project_id", project_id).order("created_at", desc=False).execute()
-            if not transcript_res.data:
-                raise Exception("No transcripts found for this project to clone.")
-                
-        segments = transcript_res.data[0].get("segments", [])
-        if not segments:
-            raise Exception("Transcript has no segments.")
-            
-        # 2. Fetch project video URL
+        # 1. Fetch project video URL
         project_res = sb.table("projects").select("video_url").eq("id", project_id).execute()
         if not project_res.data or not project_res.data[0].get("video_url"):
             raise Exception("Project video not found.")
             
         video_url = project_res.data[0]["video_url"]
         
-        # 3. Download video and extract 15s audio snippet
+        # 2. Download video
         import subprocess
         ffmpeg_exe = imageio_ffmpeg.get_ffmpeg_exe()
         
@@ -109,9 +98,57 @@ async def process_voice_clone(clone_id: str, project_id: str, lang: str, user_id
         orig_video_path = f"{temp_dir}/orig.mp4"
         with open(orig_video_path, "wb") as f:
             f.write(video_bytes)
+        
+        # 3. Ensure transcript exists for this language
+        transcript_res = sb.table("transcripts").select("segments").eq("project_id", project_id).eq("language", lang).execute()
+        if transcript_res.data:
+            segments = transcript_res.data[0].get("segments", [])
+        else:
+            # We don't have the target language transcript. Let's see if we have ANY transcript.
+            any_res = sb.table("transcripts").select("id, language, segments").eq("project_id", project_id).order("created_at", desc=False).execute()
             
+            base_segments = []
+            if any_res.data:
+                base_segments = any_res.data[0].get("segments", [])
+            else:
+                # No transcripts at all! We must transcribe the video from scratch.
+                from services.asr_service import transcribe_audio
+                full_audio_path = f"{temp_dir}/full_audio.wav"
+                subprocess.run([
+                    ffmpeg_exe, "-y", "-i", orig_video_path,
+                    "-vn", "-ar", "16000", "-ac", "1", "-acodec", "pcm_s16le",
+                    full_audio_path
+                ], check=True, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+                
+                base_segments = transcribe_audio(full_audio_path, word_timestamps=False)
+                
+                # Save base transcript
+                sb.table("transcripts").insert({
+                    "project_id": project_id,
+                    "user_id": user_id,
+                    "language": "en", # default assumption for auto-transcribe
+                    "segments": base_segments,
+                    "is_original": True
+                }).execute()
+            
+            # Now we have base_segments. Let's translate to the target language!
+            from services.translation_service import translate_segments
+            segments = await translate_segments(base_segments, lang)
+            
+            # Save the newly translated transcript
+            sb.table("transcripts").insert({
+                "project_id": project_id,
+                "user_id": user_id,
+                "language": lang,
+                "segments": segments,
+                "is_original": False
+            }).execute()
+
+        if not segments:
+            raise Exception("Transcript has no segments.")
+        
         temp_sample_path = f"{temp_dir}/sample.wav"
-        # Extract first 15 seconds of audio for cloning
+        # 4. Extract first 15 seconds of audio for cloning
         subprocess.run([
             ffmpeg_exe, "-y", "-i", orig_video_path, 
             "-t", "15", "-vn", "-acodec", "pcm_s16le", "-ar", "16000", "-ac", "1", 
