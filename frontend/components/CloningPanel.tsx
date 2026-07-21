@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from "react";
 import { Play, Check, AlertCircle, Loader2, ChevronDown } from "lucide-react";
-import { startCloning, getCloneStatus, getClones, apiFetch } from "@/lib/api";
+import { startCloning, getCloneStatus, getClones, apiFetch, API_URL } from "@/lib/api";
 import Link from "next/link";
 
 const CLONE_LANGS: Record<string, string> = {
@@ -254,8 +254,8 @@ export default function CloningPanel({
                                     <button
                                       onClick={(e) => {
                                         e.stopPropagation();
-                                        const audio = new Audio(`https://subbu-5j7u.onrender.com/preview-voice?speaker=${opt.id}&lang=${code}`);
-                                        audio.play();
+                                        const audio = new Audio(`${API_URL}/projects/preview-voice?speaker=${opt.id}&lang=${code}`);
+                                        audio.play().catch(err => console.error("Playback failed:", err));
                                       }}
                                       className="p-1.5 rounded hover:bg-black/10 dark:hover:bg-white/20 transition-colors"
                                       title="Preview Voice"
