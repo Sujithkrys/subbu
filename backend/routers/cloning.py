@@ -74,7 +74,7 @@ async def process_voice_clone(clone_id: str, project_id: str, lang: str, user_id
         AudioSegment.converter = imageio_ffmpeg.get_ffmpeg_exe()
         
         from services.sarvam_service import create_voice, generate_dubbed_segment
-        from services.storage_service import upload_file_to_r2
+        from services.storage_service import upload_file, generate_download_url
         
         # 1. Fetch transcript segments
         transcript_res = sb.table("transcripts").select("segments").eq("project_id", project_id).eq("language", lang).execute()
@@ -160,11 +160,8 @@ async def process_voice_clone(clone_id: str, project_id: str, lang: str, user_id
         ], check=True, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
         
         # 6. Upload final video to R2
-        with open(dubbed_video_path, "rb") as f:
-            final_video_bytes = f.read()
-            
-        r2_key = f"{user_id}/{project_id}/dubbed_{lang}_{uuid.uuid4().hex[:8]}.mp4"
-        final_video_url = upload_file_to_r2(final_video_bytes, r2_key, "video/mp4")
+        r2_key = f"dubbed/{user_id}/{project_id}/dubbed_{lang}_{uuid.uuid4().hex[:8]}.mp4"
+        upload_file(r2_key, dubbed_video_path, "video/mp4")
         
         # Clean up temp files
         import shutil
@@ -173,8 +170,8 @@ async def process_voice_clone(clone_id: str, project_id: str, lang: str, user_id
         # 7. Update database
         sb.table("voice_clones").update({
             "status": "ready",
-            "audio_url": final_video_url, # saving here so UI can play it as audio track if needed
-            "dubbed_video_url": final_video_url
+            "audio_url": r2_key, 
+            "dubbed_video_url": r2_key
         }).eq("id", clone_id).execute()
         
     except Exception as e:
@@ -190,14 +187,27 @@ async def process_voice_clone(clone_id: str, project_id: str, lang: str, user_id
 
 @router.get("/{project_id}/clone/{lang}/status")
 async def get_voice_clone_status(project_id: str, lang: str, user: dict = Depends(get_current_user)):
+    from services.storage_service import generate_download_url
     sb = get_supabase()
     res = sb.table("voice_clones").select("*").eq("project_id", project_id).eq("language", lang).execute()
     if not res.data:
         return {"status": "not_started"}
-    return res.data[0]
+    clone = res.data[0]
+    if clone.get("dubbed_video_url"):
+        clone["dubbed_video_url"] = generate_download_url(clone["dubbed_video_url"])
+    if clone.get("audio_url"):
+        clone["audio_url"] = generate_download_url(clone["audio_url"])
+    return clone
 
 @router.get("/{project_id}/clones")
 async def get_voice_clones(project_id: str, user: dict = Depends(get_current_user)):
+    from services.storage_service import generate_download_url
     sb = get_supabase()
     res = sb.table("voice_clones").select("*").eq("project_id", project_id).execute()
-    return res.data
+    clones = res.data
+    for clone in clones:
+        if clone.get("dubbed_video_url"):
+            clone["dubbed_video_url"] = generate_download_url(clone["dubbed_video_url"])
+        if clone.get("audio_url"):
+            clone["audio_url"] = generate_download_url(clone["audio_url"])
+    return clones
