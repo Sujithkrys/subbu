@@ -44,11 +44,11 @@ from routers import projects, transcribe, translate, cloning, style, export, sta
 from workers import transcribe_worker, translate_worker, render_worker
 
 # Mount routers
+app.include_router(preview.preview_router, tags=["Preview"])
 app.include_router(projects.router, prefix="/projects", tags=["Projects"])
 app.include_router(transcribe.router, prefix="/projects", tags=["Transcription"])
 app.include_router(translate.router, prefix="/projects", tags=["Translation"])
 app.include_router(cloning.router, prefix="/projects", tags=["Cloning"])
-app.include_router(preview.preview_router, tags=["Preview"])
 app.include_router(voice_samples.router, tags=["Voice Samples"])
 app.include_router(style.router, prefix="/projects", tags=["Styling"])
 app.include_router(export.router, prefix="/projects", tags=["Export"])
