@@ -505,7 +505,7 @@ function EditorContent() {
               currentTime={time} 
               onSeek={seek}
               onPlayPause={togglePlay}
-              isPlaying={isPlaying}
+              isPlaying={playing}
               project={project}
               captions={captions}
               activeCloneLang={activeCloneLang}
