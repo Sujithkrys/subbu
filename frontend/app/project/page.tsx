@@ -17,7 +17,7 @@ import {
 import type { ProjectDetailResponse, Transcript, StylePreset, Segment } from "@/lib/types";
 import { STYLE_PRESETS } from "@/lib/types";
 import CloningPanel from "@/components/CloningPanel";
-
+import AdvancedTimeline from "@/components/AdvancedTimeline";
 const LANGS: Record<string, string> = { te: "Telugu", hi: "Hindi", en: "English", ta: "Tamil", ml: "Malayalam", kn: "Kannada", bn: "Bengali", mr: "Marathi", gu: "Gujarati", pa: "Punjabi", hinglish: "Hinglish", tinglish: "Tinglish", tanglish: "Tanglish", benglish: "Benglish" };
 const PRESETS = [
   { id: "minimal", name: "Minimal", css: { fontSize: 14, background: "rgba(0,0,0,0.6)", fontWeight: 400 } },
@@ -498,89 +498,18 @@ function EditorContent() {
             )}
           </div>
 
-          {/* timeline strip */}
-          <div className="mx-auto mt-3 w-full max-w-3xl">
-            <div className="mb-1 flex justify-between text-[10px]" style={{ color: "var(--color-text-secondary)" }}>
-              <span>{fmt(time)}</span><span>{fmt(dur)}</span>
-            </div>
-            <div 
-              className="cursor-pointer select-none rounded-xl p-2"
-              style={{ background: "var(--color-card)", border: "1px solid var(--color-border-theme)" }}
-              onClick={(e) => {
-                // Find the track container to calculate relative click
-                const trackContainer = e.currentTarget.querySelector('.timeline-tracks');
-                if (trackContainer) {
-                  const r = trackContainer.getBoundingClientRect();
-                  let percent = (e.clientX - r.left) / r.width;
-                  percent = Math.max(0, Math.min(1, percent));
-                  seek(percent * dur);
-                }
-              }}
-            >
-              <div className="flex gap-3 relative">
-                {/* Labels Column */}
-                <div className="w-16 flex flex-col gap-1.5 shrink-0">
-                  <div className="flex items-center gap-1.5 h-7 text-[9px] font-medium" style={{ color: "var(--color-text-secondary)" }}>
-                    <Clapperboard size={10} /> Video
-                  </div>
-                  <div className="flex items-center gap-1.5 h-7 text-[9px] font-medium" style={{ color: "var(--color-text-secondary)" }}>
-                    <Mic size={10} /> Dubbing
-                  </div>
-                  <div className="flex items-center gap-1.5 h-7 text-[9px] font-medium" style={{ color: "var(--color-text-secondary)" }}>
-                    <Captions size={10} /> Captions
-                  </div>
-                </div>
-
-                {/* Tracks Column */}
-                <div className="timeline-tracks flex-1 flex flex-col gap-1.5 relative">
-                  {/* Track 1: Video */}
-                  <div className="relative h-7 w-full rounded overflow-hidden" style={{ background: "var(--color-input-bg)" }}>
-                    {project ? (
-                      <div className="absolute inset-y-0 left-0 right-0 rounded flex items-center justify-center text-[9px] font-medium" style={{ background: "rgba(141,128,199,0.3)", border: "1px solid rgba(141,128,199,0.5)", color: "white" }}>
-                        {project.title || "Video Source"}
-                      </div>
-                    ) : (
-                      <div className="absolute inset-0 bg-white/5" />
-                    )}
-                  </div>
-
-                  {/* Track 2: Dubbing */}
-                  <div className="relative h-7 w-full rounded overflow-hidden" style={{ background: "var(--color-input-bg)" }}>
-                    {activeCloneLang ? (
-                       <div className="absolute inset-0 rounded flex items-center justify-center text-[9px] font-medium" style={{ background: "rgba(76,175,125,0.15)", color: "#4caf7d", border: "1px solid rgba(76,175,125,0.3)" }}>
-                         {LANGS[activeCloneLang] || activeCloneLang} dub ready
-                       </div>
-                    ) : (
-                       <div className="absolute inset-0 flex items-center justify-center text-[9px] font-medium border border-dashed rounded" style={{ borderColor: "var(--color-border-theme)", color: "var(--color-text-muted)" }}>
-                         No voice clone preview
-                       </div>
-                    )}
-                  </div>
-
-                  {/* Track 3: Captions */}
-                  <div className="relative h-7 w-full rounded overflow-hidden" style={{ background: "var(--color-input-bg)" }}>
-                    {captions.map((c, i) => (
-                      <div
-                        key={i}
-                        onClick={(e) => { e.stopPropagation(); setSelectedId(i); seek(c.start); }}
-                        className="absolute top-0 bottom-0 flex items-center justify-center overflow-hidden rounded px-1 transition-colors hover:brightness-110"
-                        style={{
-                          left: `${(c.start / dur) * 100}%`, width: `${((c.end - c.start) / dur) * 100}%`,
-                          background: currentCaption === c ? "var(--color-accent)" : "rgba(116,105,182,0.45)",
-                        }}
-                      >
-                        <span className="truncate text-[8px] text-white">{c.text || "…"}</span>
-                      </div>
-                    ))}
-                  </div>
-                  
-                  {/* Playhead */}
-                  <div className="pointer-events-none absolute bottom-0 top-0 w-px z-20" style={{ left: `${(time / dur) * 100}%`, background: "#E5484D" }}>
-                    <div className="absolute -left-[3px] -top-1 h-2 w-[7px] rounded-sm" style={{ background: "#E5484D" }} />
-                  </div>
-                </div>
-              </div>
-            </div>
+          {/* Advanced Timeline */}
+          <div className="w-full mt-4">
+            <AdvancedTimeline 
+              duration={dur || 60} 
+              currentTime={time} 
+              onSeek={seek}
+              onPlayPause={togglePlay}
+              isPlaying={isPlaying}
+              project={project}
+              captions={captions}
+              activeCloneLang={activeCloneLang}
+            />
           </div>
         </section>
       </div>
