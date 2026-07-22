@@ -172,11 +172,17 @@ async def process_voice_clone(clone_id: str, project_id: str, lang: str, user_id
         sarvam_lang = LANG_MAP.get(lang, "hi-IN")
         fallback_speaker = speaker or DEFAULT_SPEAKER
         
+        last_end_ms = 0
+        
         for seg in segments:
             text = seg.get("text", "").strip()
             if not text: continue
                 
             start_ms = int(seg.get("start", 0.0) * 1000)
+            
+            # Prevent overlapping audio tracks if TTS generates audio longer than the segment gap
+            if start_ms < last_end_ms:
+                start_ms = last_end_ms + 50 # Add a tiny 50ms gap
             
             try:
                 if cloned_voice_id:
@@ -192,6 +198,7 @@ async def process_voice_clone(clone_id: str, project_id: str, lang: str, user_id
                     seg_audio = AudioSegment.from_file(BytesIO(audio_bytes), format="wav")
                     
                 final_audio = final_audio.overlay(seg_audio, position=start_ms)
+                last_end_ms = start_ms + len(seg_audio)
             except Exception as e:
                 print(f"Failed to generate dub for segment: {e}")
                 raise Exception(f"Audio generation completely failed: {e}")
