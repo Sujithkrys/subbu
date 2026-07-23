@@ -57,7 +57,18 @@ def transcribe_audio(
             "temperature": 0.0,
         }
         if language:
-            kwargs["language"] = language
+            if len(language) > 2:
+                lang_map = {
+                    "english": "en", "hindi": "hi", "telugu": "te", "tamil": "ta", 
+                    "malayalam": "ml", "kannada": "kn", "bengali": "bn", "marathi": "mr", 
+                    "gujarati": "gu", "punjabi": "pa", "spanish": "es", "french": "fr",
+                    "german": "de", "italian": "it", "portuguese": "pt", "russian": "ru",
+                    "japanese": "ja", "korean": "ko", "chinese": "zh", "arabic": "ar"
+                }
+                language = lang_map.get(language.lower())
+            
+            if language:
+                kwargs["language"] = language
 
         transcription = client.audio.transcriptions.create(**kwargs)
 
@@ -113,4 +124,18 @@ def detect_language(audio_path: str) -> str:
             temperature=0.0,
         )
 
-    return getattr(transcription, "language", "en")
+    lang_str = getattr(transcription, "language", "en").lower()
+    
+    # Map common full names to ISO codes
+    lang_map = {
+        "english": "en", "hindi": "hi", "telugu": "te", "tamil": "ta", 
+        "malayalam": "ml", "kannada": "kn", "bengali": "bn", "marathi": "mr", 
+        "gujarati": "gu", "punjabi": "pa", "spanish": "es", "french": "fr",
+        "german": "de", "italian": "it", "portuguese": "pt", "russian": "ru",
+        "japanese": "ja", "korean": "ko", "chinese": "zh", "arabic": "ar"
+    }
+    
+    if len(lang_str) == 2:
+        return lang_str
+        
+    return lang_map.get(lang_str, "en")
