@@ -181,7 +181,7 @@ def update_transcript(transcript_id: str, segments: list[dict] = None, review_st
 
 # ── Style helpers ────────────────────────────────────────────────────────────
 
-def save_style(project_id: str, font: str, color: str, position: str, animation_type: str = None, preset: str = "minimal") -> dict:
+def save_style(project_id: str, font: str, color: str, position: str, animation_type: str = None) -> dict:
     """Save or update subtitle style for a project."""
     sb = get_supabase()
     # Upsert: delete existing style for this project, then insert
@@ -191,8 +191,7 @@ def save_style(project_id: str, font: str, color: str, position: str, animation_
         "font": font,
         "color": color,
         "position": position,
-        "animation_type": animation_type,
-        "preset": preset
+        "animation_type": animation_type
     }).execute()
     return result.data[0]
 
