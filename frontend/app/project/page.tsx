@@ -383,11 +383,21 @@ function EditorContent() {
               <div className="mb-4">
                 <p className="mb-2 text-[11px] font-medium" style={{ color: "var(--color-text-secondary)" }}>Add a language or code-mixed style</p>
                 <div className="flex flex-wrap gap-1.5">
-                  {Object.entries(LANGS).filter(([c]) => !allLangs.includes(c)).map(([c, name]) => (
-                    <button key={c} onClick={() => addLanguage(c)} className="rounded-md px-2.5 py-1 text-[11px] transition-colors hover:bg-black/5" style={{ background: "var(--color-input-bg)", color: "var(--color-text-secondary)", border: "1px solid var(--color-border-theme)" }}>
-                      + {name}
-                    </button>
-                  ))}
+                  {Object.entries(LANGS).filter(([c]) => !allLangs.includes(c)).map(([c, name]) => {
+                    const isDisabled = !project?.transcripts || project.transcripts.length === 0;
+                    return (
+                      <button 
+                        key={c} 
+                        onClick={() => addLanguage(c)} 
+                        disabled={isDisabled}
+                        title={isDisabled ? "Wait for transcription to finish first" : `Translate to ${name}`}
+                        className={`rounded-md px-2.5 py-1 text-[11px] transition-colors ${isDisabled ? 'opacity-50 cursor-not-allowed' : 'hover:bg-black/5'}`} 
+                        style={{ background: "var(--color-input-bg)", color: "var(--color-text-secondary)", border: "1px solid var(--color-border-theme)" }}
+                      >
+                        + {name}
+                      </button>
+                    );
+                  })}
                 </div>
               </div>
 
