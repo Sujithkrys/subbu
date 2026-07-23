@@ -160,8 +160,9 @@ function EditorContent() {
     if (!currentTranscript || !projectId) return;
     try {
       await updateTranscriptSegments(projectId, currentTranscript.id, newSegments);
-    } catch (err) {
+    } catch (err: any) {
       console.error("Save failed", err);
+      fireToast(`Caption save failed: ${err.message || 'Unknown error'}`);
     }
   };
 
@@ -226,9 +227,9 @@ function EditorContent() {
       await startTranslation(projectId, { target_language: code });
       fireToast(`${LANGS[code]} added — auto-translated, review before export`);
       loadProject(); // Reload to get new transcript
-    } catch (err) {
+    } catch (err: any) {
       console.error(err);
-      fireToast("Translation failed");
+      fireToast(`Translation failed: ${err.message || 'Unknown error'}`);
     }
   };
 
@@ -424,7 +425,10 @@ function EditorContent() {
                       try {
                         await saveStyle(projectId!, { font: p.name, color: "#FFF", position: "bottom", animation_type: "none" });
                         loadProject(); // refresh style
-                      } catch (err) { console.error(err); }
+                      } catch (err: any) { 
+                        console.error(err);
+                        fireToast(`Style failed: ${err.message || 'Unknown error'}`);
+                      }
                     }}
                     className="rounded-xl p-3 text-center transition-transform hover:scale-105"
                     style={{ background: "var(--color-card)", border: `2px solid ${activePreset?.id === p.id ? "var(--color-accent)" : "var(--color-border-theme)"}` }}
