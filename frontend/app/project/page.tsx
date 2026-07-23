@@ -142,18 +142,30 @@ function EditorContent() {
       const title = file.name.replace(/\.[^/.]+$/, "");
       const newProject = await createProject({ title });
       
-      await uploadVideoToR2(newProject.upload_url, file, (pct) => setUploadProgress(pct));
+      try {
+        await uploadVideoToR2(newProject.upload_url, file, (pct) => setUploadProgress(pct));
+      } catch (uploadErr: any) {
+        console.error("R2 Upload Error:", uploadErr);
+        fireToast("Upload to storage failed. Please try again.");
+        throw uploadErr;
+      }
       
       // Start transcription immediately after upload
-      await startTranscription(newProject.id, { word_timestamps: true });
+      try {
+        await startTranscription(newProject.id, { word_timestamps: true });
+        fireToast("Video uploaded successfully! Transcription started.");
+      } catch (transcribeErr: any) {
+        console.error("Transcription Start Error:", transcribeErr);
+        fireToast(`Upload succeeded, but transcription failed to start: ${transcribeErr.message || 'Unknown error'}`);
+      }
       
-      fireToast("Video uploaded successfully! Transcription started.");
       setUploadingVideo(false);
       setLocalVideoUrl(null);
       router.replace(`/project?id=${newProject.id}`);
-    } catch (err) {
-      console.error(err);
-      fireToast("Upload failed. Please try again.");
+    } catch (err: any) {
+      console.error("Project Creation/Upload Error:", err);
+      // We only show a generic toast if it wasn't already handled by the inner catch blocks
+      fireToast("Upload workflow failed. Please try again.");
       setUploadingVideo(false);
       setLocalVideoUrl(null);
     }
