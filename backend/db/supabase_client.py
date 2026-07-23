@@ -370,3 +370,58 @@ def update_user_settings(user_id: str, theme: str) -> dict:
     else:
         res = sb.table("user_settings").insert({"user_id": user_id, "theme": theme}).execute()
         return res.data[0]
+
+
+# ── Usage helpers ────────────────────────────────────────────────────────────
+
+def get_or_create_usage(user_id: str) -> dict:
+    """Get the usage record for the current month, or create one if it doesn't exist."""
+    sb = get_supabase()
+    # current month in YYYY-MM-01 format
+    current_month = datetime.date.today().replace(day=1).isoformat()
+    
+    result = sb.table("usage").select("*").eq("user_id", user_id).eq("month", current_month).execute()
+    if result.data:
+        return result.data[0]
+        
+    # Create it
+    new_usage = {
+        "user_id": user_id,
+        "month": current_month,
+        "transcription_seconds_used": 0,
+        "translation_characters_used": 0,
+        "voice_cloning_seconds_used": 0,
+        "sarvam_stt_seconds_used": 0
+    }
+    result = sb.table("usage").insert(new_usage).execute()
+    return result.data[0]
+
+
+def increment_usage(
+    user_id: str, 
+    transcription_seconds: float = 0, 
+    translation_characters: int = 0,
+    voice_cloning_seconds: float = 0,
+    sarvam_stt_seconds: float = 0
+) -> dict:
+    """Increment usage metrics for the current month."""
+    # First get the current usage row
+    usage = get_or_create_usage(user_id)
+    
+    updates = {}
+    if transcription_seconds > 0:
+        updates["transcription_seconds_used"] = float(usage.get("transcription_seconds_used", 0) or 0) + transcription_seconds
+    if translation_characters > 0:
+        updates["translation_characters_used"] = int(usage.get("translation_characters_used", 0) or 0) + translation_characters
+    if voice_cloning_seconds > 0:
+        updates["voice_cloning_seconds_used"] = float(usage.get("voice_cloning_seconds_used", 0) or 0) + voice_cloning_seconds
+    if sarvam_stt_seconds > 0:
+        updates["sarvam_stt_seconds_used"] = float(usage.get("sarvam_stt_seconds_used", 0) or 0) + sarvam_stt_seconds
+        
+    if not updates:
+        return usage
+        
+    sb = get_supabase()
+    result = sb.table("usage").update(updates).eq("id", usage["id"]).execute()
+    return result.data[0]
+
