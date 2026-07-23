@@ -18,9 +18,9 @@ def get_qstash_client() -> QStash:
     """Get or create the QStash client."""
     global _qstash_client
     if _qstash_client is None:
-        token = os.getenv("UPSTASH_QSTASH_TOKEN")
+        token = os.getenv("UPSTASH_QSTASH_TOKEN") or os.getenv("QSTASH_TOKEN")
         if not token:
-            raise ValueError("UPSTASH_QSTASH_TOKEN must be set")
+            raise ValueError("UPSTASH_QSTASH_TOKEN or QSTASH_TOKEN must be set")
         _qstash_client = QStash(token)
     return _qstash_client
 
