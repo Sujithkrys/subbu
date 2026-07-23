@@ -58,7 +58,7 @@ export interface SubtitleStyle {
   animation_type: AnimationType | null;
   bold?: boolean;
   shadow?: boolean;
-  orientation?: "landscape" | "portrait" | "original";
+  orientation?: "original" | "landscape" | "portrait";
   created_at: string;
 }
 
@@ -198,7 +198,7 @@ export interface StylePreset {
   animation_type: AnimationType | null;
   bold?: boolean;
   shadow?: boolean;
-  orientation?: "landscape" | "portrait" | "original";
+  orientation?: "original" | "landscape" | "portrait";
 }
 
 export const STYLE_PRESETS: StylePreset[] = [

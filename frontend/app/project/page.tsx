@@ -52,11 +52,12 @@ function EditorContent() {
   const [uploadingVideo, setUploadingVideo] = useState(false);
   const [uploadProgress, setUploadProgress] = useState(0);
   const [localVideoUrl, setLocalVideoUrl] = useState<string | null>(null);
+  const [videoAspectRatio, setVideoAspectRatio] = useState<string>("16 / 9");
   const [customStyle, setCustomStyle] = useState({
     bold: false,
     shadow: false,
     color: "#FFFFFF",
-    orientation: "landscape",
+    orientation: "original",
     position: "bottom"
   });
 
@@ -596,10 +597,16 @@ function EditorContent() {
             className="relative mx-auto flex w-full max-w-3xl flex-1 items-center justify-center overflow-hidden rounded-lg min-h-0"
             style={{ background: "rgba(0,0,0,0.4)" }}
           >
-            <div className={`relative flex items-center justify-center overflow-hidden ${
-                project?.style?.orientation === 'portrait' ? 'aspect-[9/16] h-full' : 
-                project?.style?.orientation === 'landscape' ? 'aspect-video w-full' : 'w-full h-full'
-            }`}>
+            <div 
+              className="relative flex items-center justify-center overflow-hidden"
+              style={{
+                  maxHeight: "100%",
+                  maxWidth: "100%",
+                  aspectRatio: project?.style?.orientation === 'portrait' ? '9/16' : 
+                               project?.style?.orientation === 'landscape' ? '16/9' : 
+                               videoAspectRatio
+              }}
+            >
               {!project && !uploadingVideo ? (
                 <label className="cursor-pointer flex flex-col items-center justify-center w-full h-full hover:bg-black/10 transition-colors">
                   <input type="file" accept="video/mp4,video/quicktime,video/webm" className="hidden" onChange={handleFileUpload} />
@@ -627,6 +634,7 @@ function EditorContent() {
                   src={(activeCloneLang && clones[activeCloneLang]?.dubbed_video_url) ? clones[activeCloneLang].dubbed_video_url : project.video_download_url} 
                   className={`absolute inset-0 w-full h-full ${project?.style?.orientation === 'original' ? 'object-contain' : 'object-cover'}`}
                   onTimeUpdate={handleTimeUpdate}
+                  onLoadedMetadata={(e) => setVideoAspectRatio(`${e.currentTarget.videoWidth} / ${e.currentTarget.videoHeight}`)}
                   onClick={togglePlay}
                   playsInline
                 />
