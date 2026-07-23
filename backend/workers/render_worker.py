@@ -90,6 +90,7 @@ async def process_render(request: Request):
                     font_size=24,
                     primary_color=ass_color,
                     position=style["position"],
+                    animation_type=style.get("animation_type"),
                 )
                 content_type = "text/plain"
                 r2_key = f"exports/{project_id}/{export_id}.ass"

@@ -25,6 +25,9 @@ const PRESETS = [
   { id: "bold", name: "Bold Pop", css: { fontSize: 18, background: "rgba(0,0,0,0.8)", fontWeight: 700 } },
   { id: "karaoke", name: "Karaoke", css: { fontSize: 16, background: "rgba(116,105,182,0.9)", fontWeight: 600 } },
   { id: "classic", name: "Classic", css: { fontSize: 15, background: "rgba(0,0,0,0.75)", fontWeight: 400, textShadow: "1px 1px 2px #000" } },
+  { id: "cinematic-blur", name: "Cinematic Blur", css: { fontSize: 18, background: "transparent", color: "#FACC15", fontWeight: 900, fontFamily: "MontserratBlack", textShadow: "0px 0px 10px rgba(250, 204, 21, 0.5)" } },
+  { id: "flicker-shine", name: "Flicker Shine", css: { fontSize: 17, background: "transparent", color: "#00FFFF", fontWeight: 700, fontFamily: "MontserratBold" } },
+  { id: "fast-whip", name: "Fast Whip", css: { fontSize: 20, background: "transparent", color: "#FFFFFF", fontWeight: 900, fontFamily: "Impact", textShadow: "2px 2px 0px #000" } },
 ];
 
 function EditorContent() {
@@ -519,7 +522,17 @@ function EditorContent() {
             
             {currentCaption && (
               <div className="absolute bottom-10 left-0 right-0 flex justify-center px-6 pointer-events-none z-10">
-                <span className="rounded-md px-3 py-1.5 text-white" style={{...activePreset.css, textAlign: "center"}}>
+                <span 
+                  key={currentCaption.text} // Force re-render animation on text change
+                  className={`rounded-md px-3 py-1.5 text-white ${
+                    project?.style?.animation_type === 'cinematic-blur' ? 'animate-cinematic-blur' :
+                    project?.style?.animation_type === 'flicker-shine' ? 'animate-flicker-shine' :
+                    project?.style?.animation_type === 'fast-whip' ? 'animate-pop-whip' :
+                    project?.style?.animation_type === 'pop' ? 'animate-bounce' :
+                    project?.style?.animation_type === 'fade' ? 'animate-pulse' : ''
+                  }`} 
+                  style={{...activePreset.css, textAlign: "center"}}
+                >
                   {currentCaption.text}
                 </span>
               </div>

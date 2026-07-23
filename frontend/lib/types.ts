@@ -59,7 +59,7 @@ export interface SubtitleStyle {
   created_at: string;
 }
 
-export type AnimationType = "fade" | "slide" | "pop" | "typewriter" | "none" | "karaoke";
+export type AnimationType = "fade" | "slide" | "pop" | "typewriter" | "none" | "karaoke" | "cinematic-blur" | "flicker-shine" | "fast-whip";
 
 export interface ExportRecord {
   id: string;
@@ -224,5 +224,29 @@ export const STYLE_PRESETS: StylePreset[] = [
     color: "#FFFFFF",
     position: "bottom",
     animation_type: "fade",
+  },
+  {
+    name: "Cinematic Blur",
+    description: "Premium glowing yellow text that fades in with a blur",
+    font: "MontserratBlack, sans-serif",
+    color: "#FACC15",
+    position: "center",
+    animation_type: "cinematic-blur",
+  },
+  {
+    name: "Flicker Shine",
+    description: "Neon cyan glow with a flickering effect",
+    font: "MontserratBold, sans-serif",
+    color: "#00FFFF",
+    position: "bottom",
+    animation_type: "flicker-shine",
+  },
+  {
+    name: "Fast Whip",
+    description: "Punchy, fast scaling pop-in effect",
+    font: "Impact",
+    color: "#FFFFFF",
+    position: "center",
+    animation_type: "fast-whip",
   },
 ];
