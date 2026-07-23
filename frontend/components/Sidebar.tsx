@@ -30,7 +30,7 @@ export default function Sidebar() {
     >
       <button
         onClick={() => setCollapsed((v) => !v)}
-        className="mb-6 flex items-center justify-center rounded-lg p-2 self-start transition-colors"
+        className={`mb-6 flex items-center justify-center rounded-lg p-2 transition-colors ${collapsed ? "self-center" : "self-end"}`}
         style={{ color: "var(--color-text-secondary)" }}
         title={collapsed ? "Expand sidebar" : "Collapse sidebar"}
       >
