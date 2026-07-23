@@ -42,58 +42,65 @@ async def start_translation(
     4. Update project status
     5. Enqueue the translation job
     """
-    user_id = _extract_user_id(authorization)
-    project = get_project(project_id)
+    try:
+        user_id = _extract_user_id(authorization)
+        project = get_project(project_id)
 
-    if not project:
-        raise HTTPException(status_code=404, detail="Project not found")
-    if project["user_id"] != user_id:
-        raise HTTPException(status_code=403, detail="Access denied")
+        if not project:
+            raise HTTPException(status_code=404, detail="Project not found")
+        if project["user_id"] != user_id:
+            raise HTTPException(status_code=403, detail="Access denied")
 
-    # Check monthly usage limits
-    from db.supabase_client import get_or_create_usage
-    usage = get_or_create_usage(user_id)
-    if int(usage.get("translation_characters_used", 0) or 0) >= 50000:
-        raise HTTPException(
-            status_code=400,
-            detail="Monthly translation character limit (50,000 characters) reached. Upgrade your plan to continue."
+        # Check monthly usage limits
+        from db.supabase_client import get_or_create_usage
+        usage = get_or_create_usage(user_id)
+        if int(usage.get("translation_characters_used", 0) or 0) >= 50000:
+            raise HTTPException(
+                status_code=400,
+                detail="Monthly translation character limit (50,000 characters) reached. Upgrade your plan to continue."
+            )
+
+        # Find the source transcript
+        transcripts = get_transcripts(project_id)
+        if not transcripts:
+            raise HTTPException(status_code=400, detail="No transcript available. Run transcription first.")
+
+        # Use the first ASR transcript as source, or specified source
+        source_transcript = None
+        for t in transcripts:
+            if t["source"] == "asr":
+                source_transcript = t
+                break
+        if not source_transcript:
+            source_transcript = transcripts[0]
+
+        source_language = request.source_language or source_transcript["language"]
+
+        # Create job record
+        job = create_job(project_id, "translate")
+
+        # Update project status
+        update_project_status(project_id, "translating")
+
+        # Enqueue the translation job
+        message_id = enqueue_translate(
+            project_id=project_id,
+            job_id=job["id"],
+            transcript_id=source_transcript["id"],
+            source_language=source_language,
+            target_language=request.target_language,
         )
 
-    # Find the source transcript
-    transcripts = get_transcripts(project_id)
-    if not transcripts:
-        raise HTTPException(status_code=400, detail="No transcript available. Run transcription first.")
-
-    # Use the first ASR transcript as source, or specified source
-    source_transcript = None
-    for t in transcripts:
-        if t["source"] == "asr":
-            source_transcript = t
-            break
-    if not source_transcript:
-        source_transcript = transcripts[0]
-
-    source_language = request.source_language or source_transcript["language"]
-
-    # Create job record
-    job = create_job(project_id, "translate")
-
-    # Update project status
-    update_project_status(project_id, "translating")
-
-    # Enqueue the translation job
-    message_id = enqueue_translate(
-        project_id=project_id,
-        job_id=job["id"],
-        transcript_id=source_transcript["id"],
-        source_language=source_language,
-        target_language=request.target_language,
-    )
-
-    return {
-        "message": "Translation job enqueued",
-        "job_id": job["id"],
-        "source_language": source_language,
-        "target_language": request.target_language,
-        "qstash_message_id": message_id,
-    }
+        return {
+            "message": "Translation job enqueued",
+            "job_id": job["id"],
+            "source_language": source_language,
+            "target_language": request.target_language,
+            "qstash_message_id": message_id,
+        }
+    except HTTPException:
+        raise
+    except Exception as e:
+        import traceback
+        traceback.print_exc()
+        raise HTTPException(status_code=500, detail=f"Internal Server Error: {str(e)}")

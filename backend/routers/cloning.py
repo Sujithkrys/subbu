@@ -18,39 +18,46 @@ class CloneStartRequest(BaseModel):
 @router.post("/{project_id}/clone/{lang}")
 async def start_voice_clone(project_id: str, lang: str, req: CloneStartRequest, background_tasks: BackgroundTasks, user: dict = Depends(get_current_user)):
     """Start the voice cloning process."""
-    if not req.consent_given:
-        raise HTTPException(status_code=400, detail="Consent is required to clone voice")
+    try:
+        if not req.consent_given:
+            raise HTTPException(status_code=400, detail="Consent is required to clone voice")
+            
+        sb = get_supabase()
         
-    sb = get_supabase()
-    
-    # Ensure project belongs to user
-    res = sb.table("projects").select("id").eq("id", project_id).eq("user_id", user["id"]).execute()
-    if not res.data:
-        raise HTTPException(status_code=404, detail="Project not found")
+        # Ensure project belongs to user
+        res = sb.table("projects").select("id").eq("id", project_id).eq("user_id", user["id"]).execute()
+        if not res.data:
+            raise HTTPException(status_code=404, detail="Project not found")
 
-    # Get or create clone record
-    clone_res = sb.table("voice_clones").select("*").eq("project_id", project_id).eq("language", lang).execute()
-    
-    import datetime
-    if clone_res.data:
-        clone_id = clone_res.data[0]["id"]
-        sb.table("voice_clones").update({
-            "status": "cloning",
-            "consent_given_at": datetime.datetime.utcnow().isoformat()
-        }).eq("id", clone_id).execute()
-    else:
-        new_clone = sb.table("voice_clones").insert({
-            "project_id": project_id,
-            "language": lang,
-            "status": "cloning",
-            "consent_given_at": datetime.datetime.utcnow().isoformat()
-        }).execute()
-        clone_id = new_clone.data[0]["id"]
+        # Get or create clone record
+        clone_res = sb.table("voice_clones").select("*").eq("project_id", project_id).eq("language", lang).execute()
         
-    # Start background task to process
-    background_tasks.add_task(process_voice_clone, clone_id, project_id, lang, user["id"], req.speaker)
-    
-    return {"status": "cloning", "clone_id": clone_id}
+        import datetime
+        if clone_res.data:
+            clone_id = clone_res.data[0]["id"]
+            sb.table("voice_clones").update({
+                "status": "cloning",
+                "consent_given_at": datetime.datetime.utcnow().isoformat()
+            }).eq("id", clone_id).execute()
+        else:
+            new_clone = sb.table("voice_clones").insert({
+                "project_id": project_id,
+                "language": lang,
+                "status": "cloning",
+                "consent_given_at": datetime.datetime.utcnow().isoformat()
+            }).execute()
+            clone_id = new_clone.data[0]["id"]
+            
+        # Start background task to process
+        background_tasks.add_task(process_voice_clone, clone_id, project_id, lang, user["id"], req.speaker)
+        
+        return {"status": "cloning", "clone_id": clone_id}
+    except HTTPException:
+        raise
+    except Exception as e:
+        import traceback
+        traceback.print_exc()
+        raise HTTPException(status_code=500, detail=f"Internal Server Error: {str(e)}")
 
 
 async def process_voice_clone(clone_id: str, project_id: str, lang: str, user_id: str, speaker: str = None):

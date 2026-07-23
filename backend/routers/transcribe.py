@@ -40,38 +40,45 @@ async def start_transcription(
     3. Update project status to 'transcribing'
     4. Enqueue the job via QStash
     """
-    user_id = _extract_user_id(authorization)
-    project = get_project(project_id)
+    try:
+        user_id = _extract_user_id(authorization)
+        project = get_project(project_id)
 
-    if not project:
-        raise HTTPException(status_code=404, detail="Project not found")
-    if project["user_id"] != user_id:
-        raise HTTPException(status_code=403, detail="Access denied")
+        if not project:
+            raise HTTPException(status_code=404, detail="Project not found")
+        if project["user_id"] != user_id:
+            raise HTTPException(status_code=403, detail="Access denied")
 
-    # Check monthly usage limits
-    from db.supabase_client import get_or_create_usage
-    usage = get_or_create_usage(user_id)
-    if float(usage.get("transcription_seconds_used", 0) or 0) >= 1800:
-        raise HTTPException(
-            status_code=400,
-            detail="Monthly transcription limit (30 minutes) reached. Upgrade your plan to continue."
+        # Check monthly usage limits
+        from db.supabase_client import get_or_create_usage
+        usage = get_or_create_usage(user_id)
+        if float(usage.get("transcription_seconds_used", 0) or 0) >= 1800:
+            raise HTTPException(
+                status_code=400,
+                detail="Monthly transcription limit (30 minutes) reached. Upgrade your plan to continue."
+            )
+
+        # Create job record
+        job = create_job(project_id, "transcribe")
+
+        # Update project status
+        update_project_status(project_id, "transcribing")
+
+        # Enqueue the transcription job
+        message_id = enqueue_transcribe(
+            project_id=project_id,
+            job_id=job["id"],
+            source_language=request.source_language,
         )
 
-    # Create job record
-    job = create_job(project_id, "transcribe")
-
-    # Update project status
-    update_project_status(project_id, "transcribing")
-
-    # Enqueue the transcription job
-    message_id = enqueue_transcribe(
-        project_id=project_id,
-        job_id=job["id"],
-        source_language=request.source_language,
-    )
-
-    return {
-        "message": "Transcription job enqueued",
-        "job_id": job["id"],
-        "qstash_message_id": message_id,
-    }
+        return {
+            "message": "Transcription job enqueued",
+            "job_id": job["id"],
+            "qstash_message_id": message_id,
+        }
+    except HTTPException:
+        raise
+    except Exception as e:
+        import traceback
+        traceback.print_exc()
+        raise HTTPException(status_code=500, detail=f"Internal Server Error: {str(e)}")

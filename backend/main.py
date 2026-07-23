@@ -30,6 +30,13 @@ app = FastAPI(
     lifespan=lifespan,
 )
 
+@app.get("/health")
+def health_check():
+    return {
+        "status": "ok",
+        "has_upstash": bool(os.getenv("UPSTASH_QSTASH_TOKEN"))
+    }
+
 # CORS — allow frontend origin
 frontend_url = os.getenv("FRONTEND_URL", "http://localhost:3000")
 app.add_middleware(
