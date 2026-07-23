@@ -17,6 +17,7 @@ export default function JobStatusBadge({
 }: JobStatusBadgeProps) {
   const [jobs, setJobs] = useState<Job[]>([]);
   const [error, setError] = useState<string | null>(null);
+  const [projectStatus, setProjectStatus] = useState<string | null>(null);
 
   useEffect(() => {
     let intervalId: NodeJS.Timeout;
@@ -25,6 +26,7 @@ export default function JobStatusBadge({
       try {
         const status = await getProjectStatus(projectId);
         setJobs(status.jobs);
+        setProjectStatus(status.project_status);
         setError(null);
         onStatusUpdate?.(status.jobs, status.project_status);
 
@@ -54,7 +56,23 @@ export default function JobStatusBadge({
     );
   }
 
-  if (jobs.length === 0) return null;
+  // If there are no jobs, show the project status
+  if (jobs.length === 0 || !jobs.some(j => j.status === "queued" || j.status === "processing")) {
+    if (!projectStatus) return null;
+    const isReady = projectStatus === "ready";
+    return (
+      <span 
+        className="rounded-md px-2 py-0.5 text-[11px] font-medium uppercase tracking-wider" 
+        style={
+          isReady 
+            ? { color: "var(--color-green-theme)", background: "rgba(76,175,125,0.15)" }
+            : { color: "var(--color-text-secondary)", background: "var(--color-pill)" }
+        }
+      >
+        {projectStatus}
+      </span>
+    );
+  }
 
   // Show the most recent active job
   const activeJob = jobs.find(

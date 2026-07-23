@@ -18,6 +18,7 @@ import type { ProjectDetailResponse, Transcript, StylePreset, Segment } from "@/
 import { STYLE_PRESETS } from "@/lib/types";
 import CloningPanel from "@/components/CloningPanel";
 import AdvancedTimeline from "@/components/AdvancedTimeline";
+import JobStatusBadge from "@/components/JobStatusBadge";
 const LANGS: Record<string, string> = { te: "Telugu", hi: "Hindi", en: "English", ta: "Tamil", ml: "Malayalam", kn: "Kannada", bn: "Bengali", mr: "Marathi", gu: "Gujarati", pa: "Punjabi", hinglish: "Hinglish", tinglish: "Tinglish", tanglish: "Tanglish", benglish: "Benglish" };
 const PRESETS = [
   { id: "minimal", name: "Minimal", css: { fontSize: 14, background: "rgba(0,0,0,0.6)", fontWeight: 400 } },
@@ -137,13 +138,16 @@ function EditorContent() {
     setLocalVideoUrl(localUrl);
 
     try {
-      const { createProject, uploadVideoToR2 } = await import("@/lib/api");
+      const { createProject, uploadVideoToR2, startTranscription } = await import("@/lib/api");
       const title = file.name.replace(/\.[^/.]+$/, "");
       const newProject = await createProject({ title });
       
       await uploadVideoToR2(newProject.upload_url, file, (pct) => setUploadProgress(pct));
       
-      fireToast("Video uploaded successfully!");
+      // Start transcription immediately after upload
+      await startTranscription(newProject.id, { word_timestamps: true });
+      
+      fireToast("Video uploaded successfully! Transcription started.");
       setUploadingVideo(false);
       setLocalVideoUrl(null);
       router.replace(`/project?id=${newProject.id}`);
@@ -282,9 +286,7 @@ function EditorContent() {
           </button>
           <span className="text-sm font-medium">{project ? project.title || "Untitled" : "New Project"}</span>
           {project && (
-            <span className="rounded-md px-2 py-0.5 text-[11px] font-medium" style={{ color: "var(--color-green-theme)", background: "rgba(76,175,125,0.15)" }}>
-              Ready
-            </span>
+            <JobStatusBadge projectId={project.id} />
           )}
         </div>
         <div className="relative">
