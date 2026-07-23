@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import "./globals.css";
 import Sidebar from "@/components/Sidebar";
 import ThemeProvider from "@/components/ThemeProvider";
+import { SidebarProvider } from "@/components/SidebarContext";
 
 export const metadata: Metadata = {
   title: "SubGen — AI Subtitle Generator",
@@ -39,12 +40,14 @@ export default function RootLayout({
       </head>
       <body>
         <ThemeProvider>
-          <div className="flex h-screen font-sans">
-            <Sidebar />
-            <main className="flex-1 flex flex-col overflow-hidden">
-              {children}
-            </main>
-          </div>
+          <SidebarProvider>
+            <div className="flex h-screen font-sans">
+              <Sidebar />
+              <main className="flex-1 flex flex-col overflow-hidden">
+                {children}
+              </main>
+            </div>
+          </SidebarProvider>
         </ThemeProvider>
       </body>
     </html>
