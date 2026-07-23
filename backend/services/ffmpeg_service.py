@@ -109,6 +109,7 @@ def burn_subtitles(
     font_name: str = "Arial",
     font_size: int = 24,
     font_color: str = "&HFFFFFF",
+    orientation: str = "landscape",
 ) -> str:
     """
     Burn subtitles into a video using FFmpeg.
@@ -120,6 +121,7 @@ def burn_subtitles(
         font_name: Font to use for subtitles.
         font_size: Font size.
         font_color: Font color in ASS format.
+        orientation: Video orientation (landscape, portrait, original)
     
     Returns:
         Path to the output video with burned-in subtitles.
@@ -131,7 +133,16 @@ def burn_subtitles(
     if subtitle_path.endswith(".ass"):
         fonts_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), "../../frontend/public/fonts")).replace("\\", "/").replace(":", "\\:")
         sub_path_esc = subtitle_path.replace("\\", "/").replace(":", "\\:")
-        vf = f"ass='{sub_path_esc}':fontsdir='{fonts_dir}'"
+        
+        # Build filter chain
+        vf_filters = []
+        if orientation == "portrait":
+            vf_filters.append("crop=ih*9/16:ih")
+        elif orientation == "landscape":
+            vf_filters.append("crop=iw:iw*9/16")
+            
+        vf_filters.append(f"ass='{sub_path_esc}':fontsdir='{fonts_dir}'")
+        vf = ",".join(vf_filters)
     else:
         # For SRT/VTT, use subtitles filter with style override
         vf = (
@@ -220,6 +231,8 @@ def generate_ass(
     outline_color: str = "&H00000000",
     position: str = "bottom",
     animation_type: str = None,
+    bold: bool = False,
+    shadow: bool = False,
 ) -> str:
     """Generate an ASS (Advanced SubStation Alpha) subtitle file."""
     # Map position to alignment
@@ -235,6 +248,11 @@ def generate_ass(
     elif font_name == "Flicker Shine":
         font_name = "MontserratBold"
 
+    ass_bold = "-1" if bold else "0"
+    ass_shadow = "2" if shadow else "0"
+    if font_name in ["MontserratBlack", "MontserratBold", "Impact"]:
+        ass_bold = "-1"
+
     header = f"""[Script Info]
 Title: AI Subtitle Generator
 ScriptType: v4.00+
@@ -244,7 +262,7 @@ PlayResY: 1080
 
 [V4+ Styles]
 Format: Name, Fontname, Fontsize, PrimaryColour, SecondaryColour, OutlineColour, BackColour, Bold, Italic, Underline, StrikeOut, ScaleX, ScaleY, Spacing, Angle, BorderStyle, Outline, Shadow, Alignment, MarginL, MarginR, MarginV, Encoding
-Style: Default,{font_name},{font_size},{primary_color},&H000000FF,{outline_color},&H80000000,-1,0,0,0,100,100,0,0,1,2,1,{alignment},20,20,40,1
+Style: Default,{font_name},{font_size},{primary_color},&H000000FF,{outline_color},&H80000000,{ass_bold},0,0,0,100,100,0,0,1,2,{ass_shadow},{alignment},20,20,40,1
 
 [Events]
 Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text

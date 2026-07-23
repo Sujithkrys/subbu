@@ -56,6 +56,9 @@ export interface SubtitleStyle {
   color: string;
   position: "top" | "center" | "bottom";
   animation_type: AnimationType | null;
+  bold?: boolean;
+  shadow?: boolean;
+  orientation?: "landscape" | "portrait" | "original";
   created_at: string;
 }
 
@@ -136,6 +139,9 @@ export interface StyleRequest {
   color: string;
   position: string;
   animation_type?: string | null;
+  bold?: boolean;
+  shadow?: boolean;
+  orientation?: string;
 }
 
 export interface ExportRequest {
@@ -190,6 +196,9 @@ export interface StylePreset {
   color: string;
   position: "top" | "center" | "bottom";
   animation_type: AnimationType | null;
+  bold?: boolean;
+  shadow?: boolean;
+  orientation?: "landscape" | "portrait" | "original";
 }
 
 export const STYLE_PRESETS: StylePreset[] = [

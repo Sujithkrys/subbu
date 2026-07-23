@@ -74,6 +74,9 @@ create table if not exists subtitle_styles (
   color text,
   position text,
   animation_type text,
+  bold boolean default false,
+  shadow boolean default false,
+  orientation text default 'landscape',
   created_at timestamptz default now()
 );
 

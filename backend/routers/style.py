@@ -45,6 +45,9 @@ async def save_subtitle_style(
         color=request.color,
         position=request.position,
         animation_type=request.animation_type,
+        bold=request.bold,
+        shadow=request.shadow,
+        orientation=request.orientation,
     )
 
     return style

@@ -91,6 +91,8 @@ async def process_render(request: Request):
                     primary_color=ass_color,
                     position=style["position"],
                     animation_type=style.get("animation_type"),
+                    bold=style.get("bold", False),
+                    shadow=style.get("shadow", False)
                 )
                 content_type = "text/plain"
                 r2_key = f"exports/{project_id}/{export_id}.ass"
@@ -118,12 +120,15 @@ async def process_render(request: Request):
                     font_size=24,
                     primary_color=ass_color,
                     position=style["position"],
+                    animation_type=style.get("animation_type"),
+                    bold=style.get("bold", False),
+                    shadow=style.get("shadow", False)
                 )
                 update_job(job_id, "processing", progress=50)
 
                 # Burn subtitles into video
                 output_path = os.path.join(tmp_dir, f"{export_id}_subtitled.mp4")
-                burn_subtitles(video_path, ass_path, output_path)
+                burn_subtitles(video_path, ass_path, output_path, orientation=style.get("orientation", "landscape"))
                 content_type = "video/mp4"
                 r2_key = f"exports/{project_id}/{export_id}_subtitled.mp4"
                 update_job(job_id, "processing", progress=80)

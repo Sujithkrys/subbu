@@ -88,6 +88,9 @@ class StyleRequest(BaseModel):
         description="Animation: fade, slide, pop, typewriter, none"
     )
     preset: Optional[str] = Field(default="minimal", description="Style preset identifier")
+    bold: Optional[bool] = Field(default=False, description="Whether the text is bold")
+    shadow: Optional[bool] = Field(default=False, description="Whether the text has a drop shadow")
+    orientation: Optional[str] = Field(default="landscape", description="Video orientation: landscape, portrait, original")
 
 
 class StyleResponse(BaseModel):
@@ -98,6 +101,9 @@ class StyleResponse(BaseModel):
     position: str
     animation_type: Optional[str]
     preset: Optional[str] = "minimal"
+    bold: Optional[bool] = False
+    shadow: Optional[bool] = False
+    orientation: Optional[str] = "landscape"
     created_at: datetime
 
 

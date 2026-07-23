@@ -52,6 +52,13 @@ function EditorContent() {
   const [uploadingVideo, setUploadingVideo] = useState(false);
   const [uploadProgress, setUploadProgress] = useState(0);
   const [localVideoUrl, setLocalVideoUrl] = useState<string | null>(null);
+  const [customStyle, setCustomStyle] = useState({
+    bold: false,
+    shadow: false,
+    color: "#FFFFFF",
+    orientation: "landscape",
+    position: "bottom"
+  });
 
   const videoRef = useRef<HTMLVideoElement>(null);
 
@@ -79,6 +86,15 @@ function EditorContent() {
       setProject(data);
       if (data.transcripts && data.transcripts.length > 0) {
         setLang(data.transcripts[0].language);
+      }
+      if (data.style) {
+        setCustomStyle({
+          bold: data.style.bold || false,
+          shadow: data.style.shadow || false,
+          color: data.style.color || "#FFFFFF",
+          orientation: data.style.orientation || "landscape",
+          position: data.style.position || "bottom"
+        });
       }
 
       // Check for voice sample
@@ -444,13 +460,21 @@ function EditorContent() {
           ) : tool === "style" ? (
             <>
               <PanelTitle title="Caption styles" sub="Applies live to the preview" />
-              <div className="grid grid-cols-2 gap-2">
+              <div className="grid grid-cols-2 gap-2 mb-6">
                 {PRESETS.map((p) => (
                   <button
                     key={p.id} 
                     onClick={async () => {
                       try {
-                        await saveStyle(projectId!, { font: p.name, color: "#FFF", position: "bottom", animation_type: "none" });
+                        await saveStyle(projectId!, { 
+                          font: p.name, 
+                          color: customStyle.color, 
+                          position: customStyle.position, 
+                          animation_type: p.name === "Minimal" ? "fade" : p.name === "Bold Pop" ? "pop" : p.name === "Cinematic Blur" ? "cinematic-blur" : p.name === "Flicker Shine" ? "flicker-shine" : p.name === "Fast Whip" ? "fast-whip" : "none",
+                          bold: customStyle.bold,
+                          shadow: customStyle.shadow,
+                          orientation: customStyle.orientation
+                        });
                         loadProject(); // refresh style
                       } catch (err: any) { 
                         console.error(err);
@@ -467,6 +491,100 @@ function EditorContent() {
                   </button>
                 ))}
               </div>
+              
+              <PanelTitle title="Custom Adjustments" sub="Fine-tune your captions" />
+              <div className="flex flex-col gap-3">
+                <div className="flex items-center justify-between">
+                  <span className="text-sm text-gray-300">Orientation</span>
+                  <select 
+                    value={customStyle.orientation}
+                    onChange={async (e) => {
+                        const newO = e.target.value;
+                        setCustomStyle(s => ({...s, orientation: newO}));
+                        if(project?.style) {
+                            await saveStyle(projectId!, { ...project.style, orientation: newO });
+                            loadProject();
+                        }
+                    }}
+                    className="bg-black/40 text-white rounded p-1 text-sm border border-gray-700"
+                  >
+                    <option value="landscape">Landscape (16:9)</option>
+                    <option value="portrait">Portrait (9:16)</option>
+                    <option value="original">Original</option>
+                  </select>
+                </div>
+                
+                <div className="flex items-center justify-between">
+                  <span className="text-sm text-gray-300">Position</span>
+                  <select 
+                    value={customStyle.position}
+                    onChange={async (e) => {
+                        const newP = e.target.value;
+                        setCustomStyle(s => ({...s, position: newP}));
+                        if(project?.style) {
+                            await saveStyle(projectId!, { ...project.style, position: newP });
+                            loadProject();
+                        }
+                    }}
+                    className="bg-black/40 text-white rounded p-1 text-sm border border-gray-700"
+                  >
+                    <option value="top">Top</option>
+                    <option value="center">Center</option>
+                    <option value="bottom">Bottom</option>
+                  </select>
+                </div>
+                
+                <div className="flex items-center justify-between">
+                  <span className="text-sm text-gray-300">Color</span>
+                  <input 
+                    type="color" 
+                    value={customStyle.color}
+                    onChange={async (e) => {
+                        const newC = e.target.value;
+                        setCustomStyle(s => ({...s, color: newC}));
+                        if(project?.style) {
+                            await saveStyle(projectId!, { ...project.style, color: newC });
+                            loadProject();
+                        }
+                    }}
+                    className="w-8 h-8 rounded cursor-pointer"
+                  />
+                </div>
+                
+                <div className="flex items-center justify-between mt-2">
+                  <label className="flex items-center gap-2 cursor-pointer text-sm text-gray-300">
+                    <input 
+                        type="checkbox" 
+                        checked={customStyle.bold}
+                        onChange={async (e) => {
+                            const newB = e.target.checked;
+                            setCustomStyle(s => ({...s, bold: newB}));
+                            if(project?.style) {
+                                await saveStyle(projectId!, { ...project.style, bold: newB });
+                                loadProject();
+                            }
+                        }}
+                    />
+                    Bold Text
+                  </label>
+                  
+                  <label className="flex items-center gap-2 cursor-pointer text-sm text-gray-300">
+                    <input 
+                        type="checkbox" 
+                        checked={customStyle.shadow}
+                        onChange={async (e) => {
+                            const newS = e.target.checked;
+                            setCustomStyle(s => ({...s, shadow: newS}));
+                            if(project?.style) {
+                                await saveStyle(projectId!, { ...project.style, shadow: newS });
+                                loadProject();
+                            }
+                        }}
+                    />
+                    Drop Shadow
+                  </label>
+                </div>
+              </div>
               </>
             ) : null}
           </div>
@@ -478,65 +596,79 @@ function EditorContent() {
             className="relative mx-auto flex w-full max-w-3xl flex-1 items-center justify-center overflow-hidden rounded-lg min-h-0"
             style={{ background: "rgba(0,0,0,0.4)" }}
           >
-            {!project && !uploadingVideo ? (
-              <label className="cursor-pointer flex flex-col items-center justify-center w-full h-full hover:bg-black/10 transition-colors">
-                <input type="file" accept="video/mp4,video/quicktime,video/webm" className="hidden" onChange={handleFileUpload} />
-                <Upload size={48} color="white" className="mb-4 opacity-80" />
-                <span className="text-white font-medium text-lg">Click to upload video</span>
-                <span className="text-white/60 text-sm mt-2">MP4, MOV, WEBM (Max 500MB)</span>
-              </label>
-            ) : uploadingVideo ? (
-              <div className="flex flex-col items-center justify-center w-full h-full text-white">
-                {localVideoUrl && (
-                  <video src={localVideoUrl} className="absolute inset-0 w-full h-full object-contain opacity-40 blur-sm" />
-                )}
-                <div className="z-10 flex flex-col items-center w-64">
-                  <p className="mb-3 font-medium text-lg shadow-black drop-shadow-md">Uploading...</p>
-                  <div className="w-full bg-black/50 rounded-full h-2 mb-2 overflow-hidden">
-                    <div className="bg-white h-2 rounded-full transition-all duration-300" style={{ width: `${uploadProgress}%` }}></div>
+            <div className={`relative flex items-center justify-center overflow-hidden ${
+                project?.style?.orientation === 'portrait' ? 'aspect-[9/16] h-full' : 
+                project?.style?.orientation === 'landscape' ? 'aspect-video w-full' : 'w-full h-full'
+            }`}>
+              {!project && !uploadingVideo ? (
+                <label className="cursor-pointer flex flex-col items-center justify-center w-full h-full hover:bg-black/10 transition-colors">
+                  <input type="file" accept="video/mp4,video/quicktime,video/webm" className="hidden" onChange={handleFileUpload} />
+                  <Upload size={48} color="white" className="mb-4 opacity-80" />
+                  <span className="text-white font-medium text-lg">Click to upload video</span>
+                  <span className="text-white/60 text-sm mt-2">MP4, MOV, WEBM (Max 500MB)</span>
+                </label>
+              ) : uploadingVideo ? (
+                <div className="flex flex-col items-center justify-center w-full h-full text-white">
+                  {localVideoUrl && (
+                    <video src={localVideoUrl} className="absolute inset-0 w-full h-full object-cover opacity-40 blur-sm" />
+                  )}
+                  <div className="z-10 flex flex-col items-center w-64">
+                    <p className="mb-3 font-medium text-lg shadow-black drop-shadow-md">Uploading...</p>
+                    <div className="w-full bg-black/50 rounded-full h-2 mb-2 overflow-hidden">
+                      <div className="bg-white h-2 rounded-full transition-all duration-300" style={{ width: `${uploadProgress}%` }}></div>
+                    </div>
+                    <p className="text-xs text-white/80">{uploadProgress}%</p>
                   </div>
-                  <p className="text-xs text-white/80">{uploadProgress}%</p>
                 </div>
-              </div>
-            ) : project?.video_download_url ? (
-              <video 
-                key={(activeCloneLang && clones[activeCloneLang]?.dubbed_video_url) ? clones[activeCloneLang].dubbed_video_url : project.video_download_url}
-                ref={videoRef}
-                src={(activeCloneLang && clones[activeCloneLang]?.dubbed_video_url) ? clones[activeCloneLang].dubbed_video_url : project.video_download_url} 
-                className="absolute inset-0 w-full h-full object-contain"
-                onTimeUpdate={handleTimeUpdate}
-                onClick={togglePlay}
-                playsInline
-              />
-            ) : null}
-            
-            {!playing && project && !uploadingVideo && (
-              <button
-                onClick={togglePlay}
-                className="flex h-14 w-14 items-center justify-center rounded-full transition-transform hover:scale-105 z-10"
-                style={{ background: "rgba(0,0,0,0.5)", backdropFilter: "blur(4px)" }}
-              >
-                <Play size={22} fill="white" color="white" />
-              </button>
-            )}
-            
-            {currentCaption && (
-              <div className="absolute bottom-10 left-0 right-0 flex justify-center px-6 pointer-events-none z-10">
-                <span 
-                  key={currentCaption.text} // Force re-render animation on text change
-                  className={`rounded-md px-3 py-1.5 text-white ${
-                    project?.style?.animation_type === 'cinematic-blur' ? 'animate-cinematic-blur' :
-                    project?.style?.animation_type === 'flicker-shine' ? 'animate-flicker-shine' :
-                    project?.style?.animation_type === 'fast-whip' ? 'animate-pop-whip' :
-                    project?.style?.animation_type === 'pop' ? 'animate-bounce' :
-                    project?.style?.animation_type === 'fade' ? 'animate-pulse' : ''
-                  }`} 
-                  style={{...activePreset.css, textAlign: "center"}}
+              ) : project?.video_download_url ? (
+                <video 
+                  key={(activeCloneLang && clones[activeCloneLang]?.dubbed_video_url) ? clones[activeCloneLang].dubbed_video_url : project.video_download_url}
+                  ref={videoRef}
+                  src={(activeCloneLang && clones[activeCloneLang]?.dubbed_video_url) ? clones[activeCloneLang].dubbed_video_url : project.video_download_url} 
+                  className={`absolute inset-0 w-full h-full ${project?.style?.orientation === 'original' ? 'object-contain' : 'object-cover'}`}
+                  onTimeUpdate={handleTimeUpdate}
+                  onClick={togglePlay}
+                  playsInline
+                />
+              ) : null}
+              
+              {!playing && project && !uploadingVideo && (
+                <button
+                  onClick={togglePlay}
+                  className="flex h-14 w-14 items-center justify-center rounded-full transition-transform hover:scale-105 z-10 absolute"
+                  style={{ background: "rgba(0,0,0,0.5)", backdropFilter: "blur(4px)" }}
                 >
-                  {currentCaption.text}
-                </span>
-              </div>
-            )}
+                  <Play size={22} fill="white" color="white" />
+                </button>
+              )}
+              
+              {currentCaption && (
+                <div className={`absolute left-0 right-0 flex justify-center px-6 pointer-events-none z-10 ${
+                    project?.style?.position === 'top' ? 'top-10' :
+                    project?.style?.position === 'center' ? 'top-1/2 -translate-y-1/2' : 'bottom-10'
+                }`}>
+                  <span 
+                    key={currentCaption.text} // Force re-render animation on text change
+                    className={`rounded-md px-3 py-1.5 text-white ${
+                      project?.style?.animation_type === 'cinematic-blur' ? 'animate-cinematic-blur' :
+                      project?.style?.animation_type === 'flicker-shine' ? 'animate-flicker-shine' :
+                      project?.style?.animation_type === 'fast-whip' ? 'animate-pop-whip' :
+                      project?.style?.animation_type === 'pop' ? 'animate-bounce' :
+                      project?.style?.animation_type === 'fade' ? 'animate-pulse' : ''
+                    }`} 
+                    style={{
+                        ...activePreset.css, 
+                        textAlign: "center",
+                        fontWeight: project?.style?.bold ? 'bold' : activePreset.css.fontWeight,
+                        textShadow: project?.style?.shadow ? '2px 2px 4px rgba(0,0,0,0.8)' : activePreset.css.textShadow,
+                        color: project?.style?.color || activePreset.css.color || '#FFFFFF'
+                    }}
+                  >
+                    {currentCaption.text}
+                  </span>
+                </div>
+              )}
+            </div>
           </div>
 
           {/* Advanced Timeline */}
