@@ -28,19 +28,29 @@ export default function Sidebar() {
       className={`flex flex-col py-4 transition-[width] duration-150 ${collapsed ? "w-16 px-2" : "w-56 px-4"}`}
       style={{ background: "var(--color-rail)", borderRight: "1px solid var(--color-border-theme)" }}
     >
-      <button
-        onClick={() => setCollapsed((v) => !v)}
-        className={`mb-6 flex items-center justify-center rounded-lg p-2 transition-colors ${collapsed ? "self-center" : "self-end"}`}
-        style={{ color: "var(--color-text-secondary)" }}
-        title={collapsed ? "Expand sidebar" : "Collapse sidebar"}
-      >
-        <PanelLeft size={18} />
-      </button>
-
-      {!collapsed && (
-        <div className="mb-8 flex items-center gap-2.5 px-1">
-          <div className="flex h-9 w-9 items-center justify-center rounded-xl text-base font-semibold text-white" style={{ background: "var(--color-accent)" }}>సు</div>
-          <span className="text-lg font-semibold" style={{ color: "var(--color-text-primary)" }}>Subbu</span>
+      {collapsed ? (
+        <button
+          onClick={() => setCollapsed(false)}
+          className="mb-8 flex h-9 w-9 items-center justify-center self-center rounded-xl text-base font-semibold text-white transition-transform hover:scale-105"
+          style={{ background: "var(--color-accent)" }}
+          title="Expand sidebar"
+        >
+          సు
+        </button>
+      ) : (
+        <div className="mb-8 flex items-center justify-between px-1">
+          <div className="flex items-center gap-2.5">
+            <div className="flex h-9 w-9 items-center justify-center rounded-xl text-base font-semibold text-white" style={{ background: "var(--color-accent)" }}>సు</div>
+            <span className="text-lg font-semibold" style={{ color: "var(--color-text-primary)" }}>Subbu</span>
+          </div>
+          <button
+            onClick={() => setCollapsed(true)}
+            className="flex items-center justify-center rounded-lg p-2 transition-colors hover:bg-black/10 dark:hover:bg-white/10"
+            style={{ color: "var(--color-text-secondary)" }}
+            title="Collapse sidebar"
+          >
+            <PanelLeft size={18} />
+          </button>
         </div>
       )}
 
