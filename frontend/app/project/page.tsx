@@ -597,86 +597,101 @@ function EditorContent() {
             className="relative mx-auto flex w-full max-w-3xl flex-1 items-center justify-center overflow-hidden rounded-lg min-h-0"
             style={{ background: "rgba(0,0,0,0.4)" }}
           >
-            <div 
-              className="relative flex items-center justify-center overflow-hidden"
-              style={{
-                  maxHeight: "100%",
-                  maxWidth: "100%",
-                  aspectRatio: project?.style?.orientation === 'portrait' ? '9/16' : 
-                               project?.style?.orientation === 'landscape' ? '16/9' : 
-                               videoAspectRatio
-              }}
-            >
-              {!project && !uploadingVideo ? (
-                <label className="cursor-pointer flex flex-col items-center justify-center w-full h-full hover:bg-black/10 transition-colors">
-                  <input type="file" accept="video/mp4,video/quicktime,video/webm" className="hidden" onChange={handleFileUpload} />
-                  <Upload size={48} color="white" className="mb-4 opacity-80" />
-                  <span className="text-white font-medium text-lg">Click to upload video</span>
-                  <span className="text-white/60 text-sm mt-2">MP4, MOV, WEBM (Max 500MB)</span>
-                </label>
-              ) : uploadingVideo ? (
-                <div className="flex flex-col items-center justify-center w-full h-full text-white">
-                  {localVideoUrl && (
-                    <video src={localVideoUrl} className="absolute inset-0 w-full h-full object-cover opacity-40 blur-sm" />
-                  )}
-                  <div className="z-10 flex flex-col items-center w-64">
-                    <p className="mb-3 font-medium text-lg shadow-black drop-shadow-md">Uploading...</p>
-                    <div className="w-full bg-black/50 rounded-full h-2 mb-2 overflow-hidden">
-                      <div className="bg-white h-2 rounded-full transition-all duration-300" style={{ width: `${uploadProgress}%` }}></div>
-                    </div>
-                    <p className="text-xs text-white/80">{uploadProgress}%</p>
+            {!project && !uploadingVideo ? (
+              <label className="cursor-pointer flex flex-col items-center justify-center w-full h-full hover:bg-black/10 transition-colors absolute inset-0">
+                <input type="file" accept="video/mp4,video/quicktime,video/webm" className="hidden" onChange={handleFileUpload} />
+                <Upload size={48} color="white" className="mb-4 opacity-80" />
+                <span className="text-white font-medium text-lg">Click to upload video</span>
+                <span className="text-white/60 text-sm mt-2">MP4, MOV, WEBM (Max 500MB)</span>
+              </label>
+            ) : uploadingVideo ? (
+              <div className="flex flex-col items-center justify-center w-full h-full text-white absolute inset-0">
+                {localVideoUrl && (
+                  <video src={localVideoUrl} className="absolute inset-0 w-full h-full object-contain opacity-40 blur-sm" />
+                )}
+                <div className="z-10 flex flex-col items-center w-64">
+                  <p className="mb-3 font-medium text-lg shadow-black drop-shadow-md">Uploading...</p>
+                  <div className="w-full bg-black/50 rounded-full h-2 mb-2 overflow-hidden">
+                    <div className="bg-white h-2 rounded-full transition-all duration-300" style={{ width: `${uploadProgress}%` }}></div>
                   </div>
+                  <p className="text-xs text-white/80">{uploadProgress}%</p>
                 </div>
-              ) : project?.video_download_url ? (
-                <video 
-                  key={(activeCloneLang && clones[activeCloneLang]?.dubbed_video_url) ? clones[activeCloneLang].dubbed_video_url : project.video_download_url}
-                  ref={videoRef}
-                  src={(activeCloneLang && clones[activeCloneLang]?.dubbed_video_url) ? clones[activeCloneLang].dubbed_video_url : project.video_download_url} 
-                  className={`absolute inset-0 w-full h-full ${project?.style?.orientation === 'original' ? 'object-contain' : 'object-cover'}`}
-                  onTimeUpdate={handleTimeUpdate}
-                  onLoadedMetadata={(e) => setVideoAspectRatio(`${e.currentTarget.videoWidth} / ${e.currentTarget.videoHeight}`)}
-                  onClick={togglePlay}
-                  playsInline
-                />
-              ) : null}
-              
-              {!playing && project && !uploadingVideo && (
-                <button
-                  onClick={togglePlay}
-                  className="flex h-14 w-14 items-center justify-center rounded-full transition-transform hover:scale-105 z-10 absolute"
-                  style={{ background: "rgba(0,0,0,0.5)", backdropFilter: "blur(4px)" }}
+              </div>
+            ) : project?.video_download_url ? (
+              <div 
+                className="relative flex items-center justify-center w-full h-full"
+              >
+                {/* 
+                  Inner constrained box that matches video aspect ratio exactly.
+                  This ensures the subtitles never bleed into the pillarbox/letterbox areas.
+                */}
+                <div 
+                  className="relative overflow-hidden"
+                  style={{
+                      height: "100%",
+                      width: "100%",
+                      maxWidth: "100%",
+                      maxHeight: "100%",
+                      aspectRatio: project?.style?.orientation === 'portrait' ? '9/16' : 
+                                   project?.style?.orientation === 'landscape' ? '16/9' : 
+                                   videoAspectRatio,
+                      // We use object-fit equivalent behavior by setting aspect-ratio and letting flex container center it.
+                      // To prevent distortion or overflowing max bounds while keeping aspect ratio:
+                      display: "flex",
+                      margin: "0 auto",
+                      flex: "0 1 auto"
+                  }}
                 >
-                  <Play size={22} fill="white" color="white" />
-                </button>
-              )}
-              
-              {currentCaption && (
-                <div className={`absolute left-0 right-0 flex justify-center px-6 pointer-events-none z-10 ${
-                    project?.style?.position === 'top' ? 'top-10' :
-                    project?.style?.position === 'center' ? 'top-1/2 -translate-y-1/2' : 'bottom-10'
-                }`}>
-                  <span 
-                    key={currentCaption.text} // Force re-render animation on text change
-                    className={`rounded-md px-3 py-1.5 text-white ${
-                      project?.style?.animation_type === 'cinematic-blur' ? 'animate-cinematic-blur' :
-                      project?.style?.animation_type === 'flicker-shine' ? 'animate-flicker-shine' :
-                      project?.style?.animation_type === 'fast-whip' ? 'animate-pop-whip' :
-                      project?.style?.animation_type === 'pop' ? 'animate-bounce' :
-                      project?.style?.animation_type === 'fade' ? 'animate-pulse' : ''
-                    }`} 
-                    style={{
-                        ...activePreset.css, 
-                        textAlign: "center",
-                        fontWeight: project?.style?.bold ? 'bold' : activePreset.css.fontWeight,
-                        textShadow: project?.style?.shadow ? '2px 2px 4px rgba(0,0,0,0.8)' : activePreset.css.textShadow,
-                        color: project?.style?.color || activePreset.css.color || '#FFFFFF'
-                    }}
-                  >
-                    {currentCaption.text}
-                  </span>
+                  <video 
+                    key={(activeCloneLang && clones[activeCloneLang]?.dubbed_video_url) ? clones[activeCloneLang].dubbed_video_url : project.video_download_url}
+                    ref={videoRef}
+                    src={(activeCloneLang && clones[activeCloneLang]?.dubbed_video_url) ? clones[activeCloneLang].dubbed_video_url : project.video_download_url} 
+                    className={`absolute inset-0 w-full h-full ${project?.style?.orientation === 'original' ? 'object-contain' : 'object-cover'}`}
+                    onTimeUpdate={handleTimeUpdate}
+                    onLoadedMetadata={(e) => setVideoAspectRatio(`${e.currentTarget.videoWidth} / ${e.currentTarget.videoHeight}`)}
+                    onClick={togglePlay}
+                    playsInline
+                  />
+                  
+                  {!playing && (
+                    <button
+                      onClick={togglePlay}
+                      className="absolute inset-0 m-auto flex h-14 w-14 items-center justify-center rounded-full transition-transform hover:scale-105 z-10"
+                      style={{ background: "rgba(0,0,0,0.5)", backdropFilter: "blur(4px)" }}
+                    >
+                      <Play size={22} fill="white" color="white" />
+                    </button>
+                  )}
+                  
+                  {currentCaption && (
+                    <div className={`absolute left-0 right-0 flex justify-center px-6 pointer-events-none z-10 ${
+                        project?.style?.position === 'top' ? 'top-10' :
+                        project?.style?.position === 'center' ? 'top-1/2 -translate-y-1/2' : 'bottom-10'
+                    }`}>
+                      <span 
+                        key={currentCaption.text} // Force re-render animation on text change
+                        className={`rounded-md px-3 py-1.5 text-white ${
+                          project?.style?.animation_type === 'cinematic-blur' ? 'animate-cinematic-blur' :
+                          project?.style?.animation_type === 'flicker-shine' ? 'animate-flicker-shine' :
+                          project?.style?.animation_type === 'fast-whip' ? 'animate-pop-whip' :
+                          project?.style?.animation_type === 'pop' ? 'animate-bounce' :
+                          project?.style?.animation_type === 'fade' ? 'animate-pulse' : ''
+                        }`} 
+                        style={{
+                            ...activePreset.css, 
+                            textAlign: "center",
+                            fontWeight: project?.style?.bold ? 'bold' : activePreset.css.fontWeight,
+                            textShadow: project?.style?.shadow ? '2px 2px 4px rgba(0,0,0,0.8)' : activePreset.css.textShadow,
+                            color: project?.style?.color || activePreset.css.color || '#FFFFFF'
+                        }}
+                      >
+                        {currentCaption.text}
+                      </span>
+                    </div>
+                  )}
                 </div>
-              )}
-            </div>
+              </div>
+            ) : null}
           </div>
 
           {/* Advanced Timeline */}
