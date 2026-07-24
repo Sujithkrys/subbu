@@ -630,36 +630,23 @@ function EditorContent() {
                 </div>
               </div>
             ) : project?.video_download_url ? (
-              <div className="absolute inset-0 flex items-center justify-center w-full h-full pointer-events-none">
+              <div className="absolute inset-0 flex items-center justify-center w-full h-full overflow-hidden">
                 {/* 
-                  Inner constrained box that matches video aspect ratio exactly.
+                  Inner constrained box that shrink-wraps the video perfectly based on max bounds.
                   This ensures the subtitles never bleed into the pillarbox/letterbox areas.
                 */}
-                <div 
-                  className="relative pointer-events-auto"
-                  style={(() => {
-                      const targetAspect = project?.style?.orientation === 'portrait' ? 9/16 : 
-                                           project?.style?.orientation === 'landscape' ? 16/9 : 
-                                           (videoSize.w / videoSize.h);
-                      
-                      let w = parentSize.w;
-                      let h = w / targetAspect;
-                      if (h > parentSize.h) {
-                          h = parentSize.h;
-                          w = h * targetAspect;
-                      }
-                      
-                      return {
-                          width: `${w}px`,
-                          height: `${h}px`,
-                      };
-                  })()}
-                >
+                <div className="relative flex items-center justify-center max-w-full max-h-full">
                   <video 
                     key={(activeCloneLang && clones[activeCloneLang]?.dubbed_video_url) ? clones[activeCloneLang].dubbed_video_url : project.video_download_url}
                     ref={videoRef}
                     src={(activeCloneLang && clones[activeCloneLang]?.dubbed_video_url) ? clones[activeCloneLang].dubbed_video_url : project.video_download_url} 
-                    className={`absolute inset-0 w-full h-full ${project?.style?.orientation === 'original' ? 'object-contain' : 'object-cover'}`}
+                    className="max-w-full max-h-full"
+                    style={{
+                        aspectRatio: project?.style?.orientation === 'portrait' ? '9/16' : 
+                                     project?.style?.orientation === 'landscape' ? '16/9' : 
+                                     `${videoSize.w}/${videoSize.h}`,
+                        objectFit: project?.style?.orientation === 'original' ? 'contain' : 'cover'
+                    }}
                     onTimeUpdate={handleTimeUpdate}
                     onLoadedMetadata={(e) => setVideoSize({ w: e.currentTarget.videoWidth || 1920, h: e.currentTarget.videoHeight || 1080 })}
                     onClick={togglePlay}
