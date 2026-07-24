@@ -52,7 +52,18 @@ function EditorContent() {
   const [uploadingVideo, setUploadingVideo] = useState(false);
   const [uploadProgress, setUploadProgress] = useState(0);
   const [localVideoUrl, setLocalVideoUrl] = useState<string | null>(null);
-  const [videoAspectRatio, setVideoAspectRatio] = useState<string>("16 / 9");
+  const [videoSize, setVideoSize] = useState({ w: 1920, h: 1080 });
+  const [parentSize, setParentSize] = useState({ w: 0, h: 0 });
+  const containerRef = useRef<HTMLDivElement>(null);
+  
+  useEffect(() => {
+    if (!containerRef.current) return;
+    const observer = new ResizeObserver((entries) => {
+      setParentSize({ w: entries[0].contentRect.width, h: entries[0].contentRect.height });
+    });
+    observer.observe(containerRef.current);
+    return () => observer.disconnect();
+  }, []);
   const [customStyle, setCustomStyle] = useState({
     bold: false,
     shadow: false,
@@ -594,22 +605,23 @@ function EditorContent() {
         {/* preview column — always dark theme background for video readability */}
         <section className="flex min-w-0 flex-1 flex-col p-4" style={{ background: "var(--color-bg-dark-fixed, #0D0D0D)" }}>
           <div
+            ref={containerRef}
             className="relative mx-auto flex w-full max-w-3xl flex-1 items-center justify-center overflow-hidden rounded-lg min-h-0"
             style={{ background: "rgba(0,0,0,0.4)" }}
           >
             {!project && !uploadingVideo ? (
-              <label className="cursor-pointer flex flex-col items-center justify-center w-full h-full hover:bg-black/10 transition-colors absolute inset-0">
+              <label className="cursor-pointer flex flex-col items-center justify-center w-full h-full hover:bg-black/10 transition-colors absolute inset-0 z-20">
                 <input type="file" accept="video/mp4,video/quicktime,video/webm" className="hidden" onChange={handleFileUpload} />
                 <Upload size={48} color="white" className="mb-4 opacity-80" />
                 <span className="text-white font-medium text-lg">Click to upload video</span>
                 <span className="text-white/60 text-sm mt-2">MP4, MOV, WEBM (Max 500MB)</span>
               </label>
             ) : uploadingVideo ? (
-              <div className="flex flex-col items-center justify-center w-full h-full text-white absolute inset-0">
+              <div className="flex flex-col items-center justify-center w-full h-full text-white absolute inset-0 z-20">
                 {localVideoUrl && (
                   <video src={localVideoUrl} className="absolute inset-0 w-full h-full object-contain opacity-40 blur-sm" />
                 )}
-                <div className="z-10 flex flex-col items-center w-64">
+                <div className="z-30 flex flex-col items-center w-64">
                   <p className="mb-3 font-medium text-lg shadow-black drop-shadow-md">Uploading...</p>
                   <div className="w-full bg-black/50 rounded-full h-2 mb-2 overflow-hidden">
                     <div className="bg-white h-2 rounded-full transition-all duration-300" style={{ width: `${uploadProgress}%` }}></div>
@@ -618,29 +630,30 @@ function EditorContent() {
                 </div>
               </div>
             ) : project?.video_download_url ? (
-              <div 
-                className="relative flex items-center justify-center w-full h-full"
-              >
+              <div className="absolute inset-0 flex items-center justify-center w-full h-full pointer-events-none">
                 {/* 
                   Inner constrained box that matches video aspect ratio exactly.
                   This ensures the subtitles never bleed into the pillarbox/letterbox areas.
                 */}
                 <div 
-                  className="relative overflow-hidden"
-                  style={{
-                      height: "100%",
-                      width: "100%",
-                      maxWidth: "100%",
-                      maxHeight: "100%",
-                      aspectRatio: project?.style?.orientation === 'portrait' ? '9/16' : 
-                                   project?.style?.orientation === 'landscape' ? '16/9' : 
-                                   videoAspectRatio,
-                      // We use object-fit equivalent behavior by setting aspect-ratio and letting flex container center it.
-                      // To prevent distortion or overflowing max bounds while keeping aspect ratio:
-                      display: "flex",
-                      margin: "0 auto",
-                      flex: "0 1 auto"
-                  }}
+                  className="relative pointer-events-auto"
+                  style={(() => {
+                      const targetAspect = project?.style?.orientation === 'portrait' ? 9/16 : 
+                                           project?.style?.orientation === 'landscape' ? 16/9 : 
+                                           (videoSize.w / videoSize.h);
+                      
+                      let w = parentSize.w;
+                      let h = w / targetAspect;
+                      if (h > parentSize.h) {
+                          h = parentSize.h;
+                          w = h * targetAspect;
+                      }
+                      
+                      return {
+                          width: `${w}px`,
+                          height: `${h}px`,
+                      };
+                  })()}
                 >
                   <video 
                     key={(activeCloneLang && clones[activeCloneLang]?.dubbed_video_url) ? clones[activeCloneLang].dubbed_video_url : project.video_download_url}
@@ -648,7 +661,7 @@ function EditorContent() {
                     src={(activeCloneLang && clones[activeCloneLang]?.dubbed_video_url) ? clones[activeCloneLang].dubbed_video_url : project.video_download_url} 
                     className={`absolute inset-0 w-full h-full ${project?.style?.orientation === 'original' ? 'object-contain' : 'object-cover'}`}
                     onTimeUpdate={handleTimeUpdate}
-                    onLoadedMetadata={(e) => setVideoAspectRatio(`${e.currentTarget.videoWidth} / ${e.currentTarget.videoHeight}`)}
+                    onLoadedMetadata={(e) => setVideoSize({ w: e.currentTarget.videoWidth || 1920, h: e.currentTarget.videoHeight || 1080 })}
                     onClick={togglePlay}
                     playsInline
                   />
