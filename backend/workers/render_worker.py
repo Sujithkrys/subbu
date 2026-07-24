@@ -128,7 +128,7 @@ async def process_render(request: Request):
 
                 # Burn subtitles into video
                 output_path = os.path.join(tmp_dir, f"{export_id}_subtitled.mp4")
-                burn_subtitles(video_path, ass_path, output_path, orientation=style.get("orientation", "landscape"))
+                burn_subtitles(video_path, ass_path, output_path, orientation=style.get("orientation", "original"))
                 content_type = "video/mp4"
                 r2_key = f"exports/{project_id}/{export_id}_subtitled.mp4"
                 update_job(job_id, "processing", progress=80)

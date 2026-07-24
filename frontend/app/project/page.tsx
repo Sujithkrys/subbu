@@ -642,13 +642,17 @@ function EditorContent() {
                     src={(activeCloneLang && clones[activeCloneLang]?.dubbed_video_url) ? clones[activeCloneLang].dubbed_video_url : project.video_download_url} 
                     className="max-w-full max-h-full"
                     style={{
-                        aspectRatio: project?.style?.orientation === 'portrait' ? '9/16' : 
-                                     project?.style?.orientation === 'landscape' ? '16/9' : 
+                        aspectRatio: (project?.style?.orientation || 'original') === 'portrait' ? '9/16' : 
+                                     (project?.style?.orientation || 'original') === 'landscape' ? '16/9' : 
                                      `${videoSize.w}/${videoSize.h}`,
-                        objectFit: project?.style?.orientation === 'original' ? 'contain' : 'cover'
+                        objectFit: (project?.style?.orientation || 'original') === 'original' ? 'contain' : 'cover'
                     }}
                     onTimeUpdate={handleTimeUpdate}
-                    onLoadedMetadata={(e) => setVideoSize({ w: e.currentTarget.videoWidth || 1920, h: e.currentTarget.videoHeight || 1080 })}
+                    onLoadedMetadata={(e) => {
+                        if (e.currentTarget.videoWidth && e.currentTarget.videoHeight) {
+                            setVideoSize({ w: e.currentTarget.videoWidth, h: e.currentTarget.videoHeight });
+                        }
+                    }}
                     onClick={togglePlay}
                     playsInline
                   />

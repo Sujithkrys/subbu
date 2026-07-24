@@ -109,7 +109,7 @@ def burn_subtitles(
     font_name: str = "Arial",
     font_size: int = 24,
     font_color: str = "&HFFFFFF",
-    orientation: str = "landscape",
+    orientation: str = "original",
 ) -> str:
     """
     Burn subtitles into a video using FFmpeg.
