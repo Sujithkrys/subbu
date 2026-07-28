@@ -7,14 +7,14 @@ import { useSidebar } from "@/components/SidebarContext";
 export default function Sidebar() {
   const pathname = usePathname();
   const router = useRouter();
-  const { collapsed, setCollapsed } = useSidebar();
+  const { collapsed, setCollapsed, isSettingsOpen, setIsSettingsOpen } = useSidebar();
 
   // Hide sidebar entirely on login, signup, and home.
   // We NO LONGER hide it on the editor page (/project).
   const hideSidebar = pathname === "/" || pathname === "/login" || pathname === "/signup";
   if (hideSidebar) return null;
 
-  const currentMenu = pathname?.startsWith("/settings") ? "settings" 
+  const currentMenu = isSettingsOpen ? "settings" 
     : pathname?.startsWith("/project") ? "editor" 
     : "dashboard";
 
@@ -80,7 +80,7 @@ export default function Sidebar() {
 
       <div className="pt-3 mt-3" style={{ borderTop: "1px solid var(--color-border-theme)" }}>
         <button
-          onClick={() => router.push("/settings")}
+          onClick={() => setIsSettingsOpen(true)}
           title={collapsed ? "Settings" : undefined}
           className={`flex w-full items-center rounded-xl py-2.5 text-sm transition-colors ${collapsed ? "justify-center px-0" : "gap-3 px-3"}`}
           style={currentMenu === "settings" ? { background: "var(--color-accent)", color: "#FFF" } : { color: "var(--color-text-secondary)" }}

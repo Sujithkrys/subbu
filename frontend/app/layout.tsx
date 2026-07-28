@@ -3,6 +3,7 @@ import "./globals.css";
 import Sidebar from "@/components/Sidebar";
 import ThemeProvider from "@/components/ThemeProvider";
 import { SidebarProvider } from "@/components/SidebarContext";
+import SettingsModal from "@/components/SettingsModal";
 
 export const metadata: Metadata = {
   title: "SubGen — AI Subtitle Generator",
@@ -46,6 +47,7 @@ export default function RootLayout({
               <main className="flex-1 flex flex-col overflow-hidden">
                 {children}
               </main>
+              <SettingsModal />
             </div>
           </SidebarProvider>
         </ThemeProvider>

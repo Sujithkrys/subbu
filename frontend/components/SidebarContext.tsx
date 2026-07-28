@@ -6,12 +6,15 @@ import { usePathname } from "next/navigation";
 interface SidebarContextType {
   collapsed: boolean;
   setCollapsed: React.Dispatch<React.SetStateAction<boolean>>;
+  isSettingsOpen: boolean;
+  setIsSettingsOpen: React.Dispatch<React.SetStateAction<boolean>>;
 }
 
 const SidebarContext = createContext<SidebarContextType | undefined>(undefined);
 
 export function SidebarProvider({ children }: { children: React.ReactNode }) {
   const [collapsed, setCollapsed] = useState(false);
+  const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const [preEditorCollapsed, setPreEditorCollapsed] = useState(false);
   const [wasInEditor, setWasInEditor] = useState(false);
   const pathname = usePathname();
@@ -30,7 +33,7 @@ export function SidebarProvider({ children }: { children: React.ReactNode }) {
   }, [pathname, collapsed, wasInEditor, preEditorCollapsed]);
 
   return (
-    <SidebarContext.Provider value={{ collapsed, setCollapsed }}>
+    <SidebarContext.Provider value={{ collapsed, setCollapsed, isSettingsOpen, setIsSettingsOpen }}>
       {children}
     </SidebarContext.Provider>
   );
