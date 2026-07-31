@@ -1,28 +1,28 @@
 """
 ASR (Automatic Speech Recognition) Service.
-Uses Groq API with Whisper Large v3 for transcription.
+Uses Sarvam API for transcription.
 """
 
 import os
 from typing import Optional
 
-from groq import Groq
-from dotenv import load_dotenv
+from sarvamai import SarvamAI
+from dotenv import load_dotenv, find_dotenv
 
-load_dotenv()
+load_dotenv(find_dotenv())
 
-_groq_client = None
+_sarvam_client = None
 
 
-def get_groq_client() -> Groq:
-    """Get or create the Groq client."""
-    global _groq_client
-    if _groq_client is None:
-        api_key = os.getenv("GROQ_API_KEY")
+def get_sarvam_client() -> SarvamAI:
+    """Get or create the Sarvam client."""
+    global _sarvam_client
+    if _sarvam_client is None:
+        api_key = os.getenv("SARVAM_API_KEY")
         if not api_key:
-            raise ValueError("GROQ_API_KEY must be set")
-        _groq_client = Groq(api_key=api_key)
-    return _groq_client
+            raise ValueError("SARVAM_API_KEY must be set")
+        _sarvam_client = SarvamAI(api_subscription_key=api_key)
+    return _sarvam_client
 
 
 def transcribe_audio(
@@ -31,7 +31,7 @@ def transcribe_audio(
     word_timestamps: bool = False,
 ) -> list[dict]:
     """
-    Transcribe an audio file using Groq's Whisper Large v3.
+    Transcribe an audio file using Sarvam API.
     
     Args:
         audio_path: Path to the audio file (WAV, MP3, etc.)
@@ -44,66 +44,69 @@ def transcribe_audio(
             "words": [{"word": str, "start": float, "end": float}]  # if word_timestamps=True
         }, ...]
     """
-    client = get_groq_client()
+    client = get_sarvam_client()
 
-    granularities = ["segment", "word"] if word_timestamps else ["segment"]
+    lang_map = {
+        "english": "en-IN", "hindi": "hi-IN", "telugu": "te-IN", "tamil": "ta-IN", 
+        "malayalam": "ml-IN", "kannada": "kn-IN", "bengali": "bn-IN", "marathi": "mr-IN", 
+        "gujarati": "gu-IN", "punjabi": "pa-IN",
+    }
+    
+    language_code = "unknown"
+    if language:
+        lang_lower = language.lower()
+        if len(lang_lower) > 2 and lang_lower in lang_map:
+            language_code = lang_map[lang_lower]
+        elif len(lang_lower) == 2:
+            lang_code = f"{lang_lower}-IN"
+            if lang_code in lang_map.values():
+                language_code = lang_code
 
     with open(audio_path, "rb") as audio_file:
-        kwargs = {
-            "file": (os.path.basename(audio_path), audio_file.read()),
-            "model": "whisper-large-v3",
-            "response_format": "verbose_json",
-            "timestamp_granularities": granularities,
-            "temperature": 0.0,
-        }
-        if language:
-            if len(language) > 2:
-                lang_map = {
-                    "english": "en", "hindi": "hi", "telugu": "te", "tamil": "ta", 
-                    "malayalam": "ml", "kannada": "kn", "bengali": "bn", "marathi": "mr", 
-                    "gujarati": "gu", "punjabi": "pa", "spanish": "es", "french": "fr",
-                    "german": "de", "italian": "it", "portuguese": "pt", "russian": "ru",
-                    "japanese": "ja", "korean": "ko", "chinese": "zh", "arabic": "ar"
-                }
-                language = lang_map.get(language.lower())
-            
-            if language:
-                kwargs["language"] = language
+        response = client.speech_to_text.transcribe(
+            file=audio_file,
+            language_code=language_code
+        )
 
-        transcription = client.audio.transcriptions.create(**kwargs)
-
-    # Build word lookup for fast access (if word timestamps returned)
-    word_list = []
-    if word_timestamps and hasattr(transcription, "words") and transcription.words:
-        for w in transcription.words:
-            if isinstance(w, dict):
-                word_list.append({"word": w.get("word", ""), "start": w.get("start", 0.0), "end": w.get("end", 0.0)})
-            else:
-                word_list.append({"word": getattr(w, "word", ""), "start": getattr(w, "start", 0.0), "end": getattr(w, "end", 0.0)})
-
-    # Extract segments from the verbose JSON response
     segments = []
-    if hasattr(transcription, "segments") and transcription.segments:
-        for seg in transcription.segments:
-            start = round(seg.get("start", 0.0) if isinstance(seg, dict) else getattr(seg, "start", 0.0), 3)
-            end = round(seg.get("end", 0.0) if isinstance(seg, dict) else getattr(seg, "end", 0.0), 3)
-            text = (seg.get("text", "") if isinstance(seg, dict) else getattr(seg, "text", "")).strip()
-
-            segment_obj: dict = {"start": start, "end": end, "text": text}
-
-            if word_timestamps and word_list:
-                # Filter words that fall within this segment's time range
-                seg_words = [w for w in word_list if w["start"] >= start - 0.05 and w["end"] <= end + 0.05]
-                if seg_words:
-                    segment_obj["words"] = seg_words
-
-            segments.append(segment_obj)
+    
+    if hasattr(response, "timestamps") and response.timestamps:
+        ts = response.timestamps
+        words = ts.words
+        starts = ts.start_time_seconds
+        ends = ts.end_time_seconds
+        
+        current_segment = {"start": 0.0, "end": 0.0, "text": "", "words": []}
+        for i in range(len(words)):
+            w = words[i]
+            s = starts[i]
+            e = ends[i]
+            
+            if not current_segment["words"]:
+                current_segment["start"] = round(s, 3)
+                
+            current_segment["words"].append({"word": w, "start": round(s, 3), "end": round(e, 3)})
+            current_segment["end"] = round(e, 3)
+            
+            pause = starts[i+1] - e if i + 1 < len(words) else 0
+            if pause > 0.5 or len(current_segment["words"]) >= 15:
+                current_segment["text"] = " ".join([w["word"] for w in current_segment["words"]])
+                if not word_timestamps:
+                    current_segment.pop("words", None)
+                segments.append(current_segment)
+                current_segment = {"start": 0.0, "end": 0.0, "text": "", "words": []}
+                
+        if current_segment["words"]:
+            current_segment["text"] = " ".join([w["word"] for w in current_segment["words"]])
+            if not word_timestamps:
+                current_segment.pop("words", None)
+            segments.append(current_segment)
     else:
         # Fallback: single segment with full text
         segments.append({
             "start": 0.0,
             "end": 0.0,
-            "text": transcription.text.strip() if transcription.text else "",
+            "text": response.transcript if hasattr(response, "transcript") else "",
         })
 
     return segments
@@ -114,28 +117,16 @@ def detect_language(audio_path: str) -> str:
     Detect the language of an audio file.
     Returns the ISO language code.
     """
-    client = get_groq_client()
+    client = get_sarvam_client()
 
     with open(audio_path, "rb") as audio_file:
-        transcription = client.audio.transcriptions.create(
-            file=(os.path.basename(audio_path), audio_file.read()),
-            model="whisper-large-v3",
-            response_format="verbose_json",
-            temperature=0.0,
+        response = client.speech_to_text.transcribe(
+            file=audio_file,
+            language_code="unknown"
         )
-
-    lang_str = getattr(transcription, "language", "en").lower()
-    
-    # Map common full names to ISO codes
-    lang_map = {
-        "english": "en", "hindi": "hi", "telugu": "te", "tamil": "ta", 
-        "malayalam": "ml", "kannada": "kn", "bengali": "bn", "marathi": "mr", 
-        "gujarati": "gu", "punjabi": "pa", "spanish": "es", "french": "fr",
-        "german": "de", "italian": "it", "portuguese": "pt", "russian": "ru",
-        "japanese": "ja", "korean": "ko", "chinese": "zh", "arabic": "ar"
-    }
-    
-    if len(lang_str) == 2:
-        return lang_str
         
-    return lang_map.get(lang_str, "en")
+    lang_str = getattr(response, "language_code", "en-IN")
+    if lang_str:
+        return lang_str.split("-")[0]
+        
+    return "en"

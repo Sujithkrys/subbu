@@ -1,23 +1,26 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef } from "react";
 import { getProjectStatus } from "@/lib/api";
 import type { Job } from "@/lib/types";
 
 interface JobStatusBadgeProps {
   projectId: string;
   onStatusUpdate?: (jobs: Job[], projectStatus: string) => void;
+  onJobComplete?: () => void;
   pollInterval?: number;
 }
 
 export default function JobStatusBadge({
   projectId,
   onStatusUpdate,
+  onJobComplete,
   pollInterval = 3000,
 }: JobStatusBadgeProps) {
   const [jobs, setJobs] = useState<Job[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [projectStatus, setProjectStatus] = useState<string | null>(null);
+  const prevActiveCountRef = useRef<number>(0);
 
   useEffect(() => {
     let intervalId: NodeJS.Timeout;
@@ -30,11 +33,16 @@ export default function JobStatusBadge({
         setError(null);
         onStatusUpdate?.(status.jobs, status.project_status);
 
-        // Stop polling if all jobs are done or failed
-        const hasActiveJobs = status.jobs.some(
+        const activeCount = status.jobs.filter(
           (j) => j.status === "queued" || j.status === "processing"
-        );
-        if (!hasActiveJobs) {
+        ).length;
+        
+        if (prevActiveCountRef.current > 0 && activeCount === 0) {
+          onJobComplete?.();
+        }
+        prevActiveCountRef.current = activeCount;
+
+        if (activeCount === 0) {
           clearInterval(intervalId);
         }
       } catch (err) {
@@ -42,11 +50,11 @@ export default function JobStatusBadge({
       }
     };
 
-    poll(); // Initial poll
+    poll();
     intervalId = setInterval(poll, pollInterval);
 
     return () => clearInterval(intervalId);
-  }, [projectId, pollInterval]);
+  }, [projectId, pollInterval, onJobComplete]);
 
   if (error) {
     return (

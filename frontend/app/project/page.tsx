@@ -104,7 +104,7 @@ function EditorContent() {
           bold: data.style.bold || false,
           shadow: data.style.shadow || false,
           color: data.style.color || "#FFFFFF",
-          orientation: data.style.orientation || "landscape",
+          orientation: data.style.orientation || "original",
           position: data.style.position || "bottom"
         });
       }
@@ -182,13 +182,7 @@ function EditorContent() {
       }
       
       // Start transcription immediately after upload
-      try {
-        await startTranscription(newProject.id, { word_timestamps: true });
-        fireToast("Video uploaded successfully! Transcription started.");
-      } catch (transcribeErr: any) {
-        console.error("Transcription Start Error:", transcribeErr);
-        fireToast(`Upload succeeded, but transcription failed to start: ${transcribeErr.message || 'Unknown error'}`);
-      }
+      fireToast("Video uploaded successfully! Select a language to transcribe.");
       
       setUploadingVideo(false);
       setLocalVideoUrl(null);
@@ -329,7 +323,10 @@ function EditorContent() {
           </button>
           <span className="text-sm font-medium">{project ? project.title || "Untitled" : "New Project"}</span>
           {project && (
-            <JobStatusBadge projectId={project.id} />
+            <JobStatusBadge 
+              projectId={project.id} 
+              onJobComplete={loadProject} 
+            />
           )}
         </div>
         <div className="relative">
@@ -412,17 +409,32 @@ function EditorContent() {
               </div>
 
               <div className="mb-4">
-                <p className="mb-2 text-[11px] font-medium" style={{ color: "var(--color-text-secondary)" }}>Add a language or code-mixed style</p>
+                <p className="mb-2 text-[11px] font-medium" style={{ color: "var(--color-text-secondary)" }}>
+                  {!project?.transcripts || project.transcripts.length === 0 ? "Select original language to start:" : "Add a language or code-mixed style"}
+                </p>
                 <div className="flex flex-wrap gap-1.5">
                   {Object.entries(LANGS).filter(([c]) => !allLangs.includes(c)).map(([c, name]) => {
-                    const isDisabled = !project?.transcripts || project.transcripts.length === 0;
+                    const isFirst = !project?.transcripts || project.transcripts.length === 0;
                     return (
                       <button 
                         key={c} 
-                        onClick={() => addLanguage(c)} 
-                        disabled={isDisabled}
-                        title={isDisabled ? "Wait for transcription to finish first" : `Translate to ${name}`}
-                        className={`rounded-md px-2.5 py-1 text-[11px] transition-colors ${isDisabled ? 'opacity-50 cursor-not-allowed' : 'hover:bg-black/5'}`} 
+                        onClick={async () => {
+                          if (isFirst) {
+                             fireToast(`Generating ${name} captions...`);
+                             try {
+                               const { startTranscription } = await import("@/lib/api");
+                               await startTranscription(projectId!, { word_timestamps: true, source_language: c });
+                               fireToast("Transcription started.");
+                               loadProject();
+                             } catch (err: any) {
+                               fireToast(`Transcription failed: ${err.message}`);
+                             }
+                          } else {
+                             addLanguage(c);
+                          }
+                        }} 
+                        title={isFirst ? `Transcribe video in ${name}` : `Translate to ${name}`}
+                        className={`rounded-md px-2.5 py-1 text-[11px] transition-colors hover:bg-black/5`} 
                         style={{ background: "var(--color-input-bg)", color: "var(--color-text-secondary)", border: "1px solid var(--color-border-theme)" }}
                       >
                         + {name}
