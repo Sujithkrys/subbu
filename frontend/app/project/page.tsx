@@ -447,7 +447,7 @@ function EditorContent() {
               <div className="flex-1 space-y-2 pb-10">
                 {captions.map((c, i) => (
                   <div
-                    key={i} onClick={() => { setSelectedId(i); seek(c.start); }}
+                    key={i} onClick={(e) => { e.stopPropagation(); setSelectedId(i); seek(c.start); }}
                     className="cursor-pointer rounded-xl p-2.5 transition-colors"
                     style={{
                       background: "var(--color-card)",
@@ -465,6 +465,7 @@ function EditorContent() {
                       <input
                         autoFocus value={c.text}
                         onChange={(e) => setCaptionText(i, e.target.value)}
+                        onBlur={() => setSelectedId(null)}
                         className="w-full rounded-md px-2 py-1 text-xs outline-none"
                         style={{ background: "var(--color-input-bg)", color: "var(--color-text-primary)", border: "1px solid var(--color-border-theme)" }}
                       />
@@ -647,16 +648,18 @@ function EditorContent() {
                   Inner constrained box that shrink-wraps the video perfectly based on max bounds.
                   This ensures the subtitles never bleed into the pillarbox/letterbox areas.
                 */}
-                <div className="relative flex items-center justify-center max-w-full max-h-full">
+                <div className="relative flex items-center justify-center max-w-full max-h-full"
+                     style={{
+                        aspectRatio: (project?.style?.orientation || 'original') === 'portrait' ? '9/16' : 
+                                     (project?.style?.orientation || 'original') === 'landscape' ? '16/9' : 
+                                     `${videoSize.w}/${videoSize.h}`
+                     }}>
                   <video 
                     key={(activeCloneLang && clones[activeCloneLang]?.dubbed_video_url) ? clones[activeCloneLang].dubbed_video_url : project.video_download_url}
                     ref={videoRef}
                     src={(activeCloneLang && clones[activeCloneLang]?.dubbed_video_url) ? clones[activeCloneLang].dubbed_video_url : project.video_download_url} 
-                    className="max-w-full max-h-full"
+                    className="w-full h-full"
                     style={{
-                        aspectRatio: (project?.style?.orientation || 'original') === 'portrait' ? '9/16' : 
-                                     (project?.style?.orientation || 'original') === 'landscape' ? '16/9' : 
-                                     `${videoSize.w}/${videoSize.h}`,
                         objectFit: (project?.style?.orientation || 'original') === 'original' ? 'contain' : 'cover'
                     }}
                     onTimeUpdate={handleTimeUpdate}

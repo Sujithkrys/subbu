@@ -107,8 +107,9 @@ async def process_transcription(request: Request):
 
         # Step 7.5: Increment usage limits and log activity
         try:
+            provider = segments[0].get("source_provider", "unknown") if segments else "unknown"
             increment_usage(project["user_id"], transcription_seconds=duration)
-            log_activity(project["user_id"], "transcription_completed", project_id, details={"language": final_lang})
+            log_activity(project["user_id"], "transcription_completed", project_id, details={"language": source_language, "provider": provider})
         except Exception as e:
             print(f"Warning: Failed to increment usage: {e}")
 

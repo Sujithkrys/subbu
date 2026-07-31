@@ -8,10 +8,23 @@ from typing import Optional
 
 from sarvamai import SarvamAI
 from dotenv import load_dotenv, find_dotenv
+from groq import Groq
 
 load_dotenv(find_dotenv())
 
 _sarvam_client = None
+_groq_client = None
+
+def get_groq_client() -> Groq:
+    """Get or create the Groq client for fallback."""
+    global _groq_client
+    if _groq_client is None:
+        api_key = os.getenv("GROQ_API_KEY")
+        if not api_key:
+            raise ValueError("GROQ_API_KEY must be set for STT fallback")
+        _groq_client = Groq(api_key=api_key)
+    return _groq_client
+
 
 
 def get_sarvam_client() -> SarvamAI:
@@ -62,11 +75,32 @@ def transcribe_audio(
             if lang_code in lang_map.values():
                 language_code = lang_code
 
-    with open(audio_path, "rb") as audio_file:
-        response = client.speech_to_text.transcribe(
-            file=audio_file,
-            language_code=language_code
-        )
+    # Diagnostics
+    import os
+    import wave
+    file_size = os.path.getsize(audio_path)
+    try:
+        with wave.open(audio_path, 'rb') as w:
+            frames = w.getnframes()
+            rate = w.getframerate()
+            duration = frames / float(rate)
+    except Exception:
+        duration = -1
+
+    print(f"[DIAGNOSTIC] Calling Sarvam STT. Audio: {audio_path}, Size: {file_size} bytes, Duration: {duration}s, Lang: {language_code}")
+
+    try:
+        with open(audio_path, "rb") as audio_file:
+            response = client.speech_to_text.transcribe(
+                file=audio_file,
+                language_code=language_code
+            )
+    except Exception as e:
+        import traceback
+        print(f"[DIAGNOSTIC] Sarvam STT failed! Exception: {e}")
+        print(f"[DIAGNOSTIC] Traceback: {traceback.format_exc()}")
+        print("[DIAGNOSTIC] Falling back to Groq Whisper...")
+        return _transcribe_audio_groq(audio_path, language, word_timestamps)
 
     segments = []
     
@@ -93,6 +127,7 @@ def transcribe_audio(
                 current_segment["text"] = " ".join([w["word"] for w in current_segment["words"]])
                 if not word_timestamps:
                     current_segment.pop("words", None)
+                current_segment["source_provider"] = "sarvam"
                 segments.append(current_segment)
                 current_segment = {"start": 0.0, "end": 0.0, "text": "", "words": []}
                 
@@ -100,6 +135,7 @@ def transcribe_audio(
             current_segment["text"] = " ".join([w["word"] for w in current_segment["words"]])
             if not word_timestamps:
                 current_segment.pop("words", None)
+            current_segment["source_provider"] = "sarvam"
             segments.append(current_segment)
     else:
         # Fallback: single segment with full text
@@ -107,8 +143,54 @@ def transcribe_audio(
             "start": 0.0,
             "end": 0.0,
             "text": response.transcript if hasattr(response, "transcript") else "",
+            "source_provider": "sarvam"
         })
 
+    return segments
+
+def _transcribe_audio_groq(audio_path: str, language: Optional[str], word_timestamps: bool) -> list[dict]:
+    """Fallback transcription using Groq Whisper Large v3."""
+    groq_client = get_groq_client()
+    
+    lang_code = "en"
+    if language and len(language) >= 2:
+        lang_code = language[:2].lower()
+        
+    with open(audio_path, "rb") as f:
+        # Groq expects a tuple for the file if we want to pass bytes directly, or just the file object
+        # Since the file extension might just be .wav, we can pass the file object directly.
+        transcription = groq_client.audio.transcriptions.create(
+            file=("audio.wav", f.read()),
+            model="whisper-large-v3",
+            prompt="Spoken audio.",
+            response_format="verbose_json",
+            language=lang_code
+        )
+        
+    segments = []
+    if hasattr(transcription, "segments") and transcription.segments:
+        for s in transcription.segments:
+            seg = {
+                "start": round(s["start"] if isinstance(s, dict) else s.start, 3),
+                "end": round(s["end"] if isinstance(s, dict) else s.end, 3),
+                "text": (s["text"] if isinstance(s, dict) else s.text).strip(),
+                "source_provider": "groq_fallback"
+            }
+            # Note: Groq Whisper doesn't always return word-level timestamps in the python SDK perfectly,
+            # but if they exist, we extract them.
+            if word_timestamps and hasattr(s, "words") and s.words:
+                seg["words"] = [{"word": w["word"] if isinstance(w, dict) else w.word, 
+                                 "start": round(w["start"] if isinstance(w, dict) else w.start, 3), 
+                                 "end": round(w["end"] if isinstance(w, dict) else w.end, 3)} 
+                                for w in (s["words"] if isinstance(s, dict) else s.words)]
+            segments.append(seg)
+    else:
+        segments.append({
+            "start": 0.0,
+            "end": 0.0,
+            "text": transcription.text if hasattr(transcription, "text") else "",
+            "source_provider": "groq_fallback"
+        })
     return segments
 
 
