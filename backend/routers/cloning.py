@@ -149,7 +149,7 @@ async def process_voice_clone(clone_id: str, project_id: str, lang: str, user_id
                 "project_id": project_id,
                 "language": lang,
                 "segments": segments,
-                "source": "gemini-translate"
+                "source": "sarvam-translate"
             }).execute()
 
         if not segments:
