@@ -15,16 +15,16 @@ load_dotenv()
 # Map UI language codes to Sarvam language codes and modes
 # Mayura:v1 supports bn, en, gu, hi, kn, ml, mr, or, pa, ta, te
 LANG_CONFIG = {
-    "en": {"code": "en-IN", "mode": "modern-colloquial"},
-    "hi": {"code": "hi-IN", "mode": "modern-colloquial"},
-    "te": {"code": "te-IN", "mode": "modern-colloquial"},
-    "ta": {"code": "ta-IN", "mode": "modern-colloquial"},
-    "kn": {"code": "kn-IN", "mode": "modern-colloquial"},
-    "ml": {"code": "ml-IN", "mode": "modern-colloquial"},
-    "bn": {"code": "bn-IN", "mode": "modern-colloquial"},
-    "mr": {"code": "mr-IN", "mode": "modern-colloquial"},
-    "gu": {"code": "gu-IN", "mode": "modern-colloquial"},
-    "pa": {"code": "pa-IN", "mode": "modern-colloquial"},
+    "en": {"code": "en-IN", "mode": "formal"},
+    "hi": {"code": "hi-IN", "mode": "formal"},
+    "te": {"code": "te-IN", "mode": "formal"},
+    "ta": {"code": "ta-IN", "mode": "formal"},
+    "kn": {"code": "kn-IN", "mode": "formal"},
+    "ml": {"code": "ml-IN", "mode": "formal"},
+    "bn": {"code": "bn-IN", "mode": "formal"},
+    "mr": {"code": "mr-IN", "mode": "formal"},
+    "gu": {"code": "gu-IN", "mode": "formal"},
+    "pa": {"code": "pa-IN", "mode": "formal"},
     
     # Code-mixed target options map to base languages but use "code-mixed" mode
     "hinglish": {"code": "hi-IN", "mode": "code-mixed"},

@@ -134,7 +134,9 @@ def _transcribe_single_file(audio_path: str, language_code: str, word_timestamps
         with open(audio_path, "rb") as audio_file:
             response = client.speech_to_text.transcribe(
                 file=audio_file,
-                language_code=language_code
+                language_code=language_code,
+                model="saaras:v3",
+                with_timestamps=True
             )
     except Exception as e:
         import traceback
