@@ -237,19 +237,41 @@ def _transcribe_audio_groq(audio_path: str, language: Optional[str], word_timest
 
 def detect_language(audio_path: str) -> str:
     """
-    Detect the language of an audio file.
-    Returns the ISO language code.
+    Detect the language of an audio file, using only a short sample
+    to stay under Sarvam's 30-second REST limit and avoid unnecessary
+    extra API calls.
     """
-    client = get_sarvam_client()
+    import subprocess
+    import tempfile
+    import os
 
-    with open(audio_path, "rb") as audio_file:
-        response = client.speech_to_text.transcribe(
-            file=audio_file,
-            language_code="unknown"
-        )
-        
-    lang_str = getattr(response, "language_code", "en-IN")
-    if lang_str:
-        return lang_str.split("-")[0]
-        
-    return "en"
+    client = get_sarvam_client()
+    sample_path = audio_path  # fallback to original if trimming fails
+
+    with tempfile.TemporaryDirectory() as tmpdir:
+        trimmed_path = os.path.join(tmpdir, "detect_sample.wav")
+        cmd = [
+            "ffmpeg", "-y", "-i", audio_path,
+            "-t", "15",  # first 15 seconds only
+            "-c", "copy", trimmed_path,
+        ]
+        result = subprocess.run(cmd, capture_output=True, text=True)
+
+        if result.returncode == 0 and os.path.exists(trimmed_path):
+            sample_path = trimmed_path
+        else:
+            print(f"[DIAGNOSTIC] Could not trim audio for detection, using full file. FFmpeg error: {result.stderr}")
+
+        try:
+            with open(sample_path, "rb") as audio_file:
+                response = client.speech_to_text.transcribe(
+                    file=audio_file,
+                    language_code="unknown",
+                )
+            lang_str = getattr(response, "language_code", "en-IN")
+            if lang_str:
+                return lang_str.split("-")[0]
+            return "en"
+        except Exception as e:
+            print(f"[DIAGNOSTIC] Language detection failed: {e}. Defaulting to English.")
+            return "en"
