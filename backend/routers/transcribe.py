@@ -69,6 +69,7 @@ async def start_transcription(
             project_id=project_id,
             job_id=job["id"],
             source_language=request.source_language,
+            target_language=request.target_language,
         )
 
         return {

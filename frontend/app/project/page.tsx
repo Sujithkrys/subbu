@@ -40,13 +40,15 @@ function EditorContent() {
   
   const [tool, setTool] = useState<"cloning" | "captions" | "style">("captions");
   const [lang, setLang] = useState<string>("");
+  const [sourceLang, setSourceLang] = useState<string>("");
   const [hasVoiceSample, setHasVoiceSample] = useState(false);
   const [activeCloneLang, setActiveCloneLang] = useState<string | null>(null);
   const [clones, setClones] = useState<Record<string, any>>({});
   const [time, setTime] = useState(0);
   const [playing, setPlaying] = useState(false);
   const [selectedId, setSelectedId] = useState<number | null>(null);
-  const [exportOpen, setExportOpen] = useState(false);
+  const [isExporting, setIsExporting] = useState(false);
+  const [addingLang, setAddingLang] = useState<string | null>(null);
   const [toast, setToast] = useState("");
   
   const [uploadingVideo, setUploadingVideo] = useState(false);
@@ -263,6 +265,7 @@ function EditorContent() {
     const existing = project?.transcripts.map(t => t.language) || [];
     if (existing.includes(code)) return;
     
+    setAddingLang(code);
     fireToast(`${LANGS[code]} translation starting...`);
     try {
       await startTranslation(projectId, { target_language: code });
@@ -271,6 +274,8 @@ function EditorContent() {
     } catch (err: any) {
       console.error(err);
       fireToast(`Translation failed: ${err.message || 'Unknown error'}`);
+    } finally {
+      setAddingLang(null);
     }
   };
 
@@ -302,7 +307,8 @@ function EditorContent() {
     return <div className="flex-1 flex items-center justify-center h-screen" style={{ background: "var(--color-bg-theme)" }}><p style={{color: "var(--color-text-secondary)"}}>Loading editor...</p></div>;
   }
 
-  const allLangs = project?.transcripts?.map(t => t.language) || [];
+  const allLangs = Array.from(new Set(project?.transcripts?.map(t => t.language) || []));
+  const sourceLang = project?.transcripts?.find(t => t.source === "asr")?.language;
   const activePreset = PRESETS.find(p => p.name === project?.style?.font) || PRESETS[0];
 
   const tools = [
@@ -402,7 +408,7 @@ function EditorContent() {
                       className="rounded-md px-2 py-1 text-[11px] font-medium transition-colors"
                       style={lang === l ? { background: "var(--color-accent)", color: "#FFF" } : { background: "var(--color-input-bg)", color: "var(--color-text-secondary)" }}
                     >
-                      {LANGS[l] || l}
+                      {LANGS[l] || l}{l === sourceLang ? " (Source)" : ""}
                     </button>
                   ))}
                 </div>
@@ -412,35 +418,49 @@ function EditorContent() {
                 <p className="mb-2 text-[11px] font-medium" style={{ color: "var(--color-text-secondary)" }}>
                   {!project?.transcripts || project.transcripts.length === 0 ? "Select original language to start:" : "Add a language or code-mixed style"}
                 </p>
-                <div className="flex flex-wrap gap-1.5">
-                  {Object.entries(LANGS).filter(([c]) => !allLangs.includes(c)).map(([c, name]) => {
-                    const isFirst = !project?.transcripts || project.transcripts.length === 0;
-                    return (
-                      <button 
-                        key={c} 
-                        onClick={async () => {
-                          if (isFirst) {
-                             fireToast(`Generating ${name} captions...`);
+                  {!project?.transcripts || project.transcripts.length === 0 ? (
+                    <div className="flex flex-wrap gap-1.5">
+                      {Object.entries(LANGS).filter(([c]) => !allLangs.includes(c)).map(([c, name]) => (
+                        <button 
+                          key={c} 
+                          onClick={async () => {
+                             setAddingLang(c);
+                             fireToast(`Transcribing and translating to ${name}...`);
                              try {
                                const { startTranscription } = await import("@/lib/api");
-                               await startTranscription(projectId!, { word_timestamps: true, source_language: c });
-                               fireToast("Transcription started.");
+                               await startTranscription(projectId!, { word_timestamps: true, target_language: c });
+                               fireToast("Processing started.");
                                loadProject();
                              } catch (err: any) {
-                               fireToast(`Transcription failed: ${err.message}`);
+                               fireToast(`Failed: ${err.message}`);
+                             } finally {
+                               setAddingLang(null);
                              }
-                          } else {
-                             addLanguage(c);
-                          }
-                        }} 
-                        title={isFirst ? `Transcribe video in ${name}` : `Translate to ${name}`}
-                        className={`rounded-md px-2.5 py-1 text-[11px] transition-colors hover:bg-black/5`} 
-                        style={{ background: "var(--color-input-bg)", color: "var(--color-text-secondary)", border: "1px solid var(--color-border-theme)" }}
-                      >
-                        + {name}
-                      </button>
-                    );
-                  })}
+                          }}
+                          disabled={addingLang === c}
+                          className={`rounded-md px-2.5 py-1 text-[11px] transition-colors hover:bg-black/5 ${addingLang === c ? 'opacity-50 cursor-not-allowed' : ''}`} 
+                          style={{ background: "var(--color-input-bg)", color: "var(--color-text-secondary)", border: "1px solid var(--color-border-theme)" }}
+                        >
+                          {addingLang === c ? 'Starting...' : `+ ${name}`}
+                        </button>
+                      ))}
+                    </div>
+                  ) : (
+                    <div className="flex flex-wrap gap-1.5">
+                      {Object.entries(LANGS).filter(([c]) => !allLangs.includes(c)).map(([c, name]) => (
+                        <button 
+                          key={c} 
+                          onClick={() => addLanguage(c)}
+                          disabled={addingLang === c}
+                          title={`Translate to ${name}`}
+                          className={`rounded-md px-2.5 py-1 text-[11px] transition-colors hover:bg-black/5 ${addingLang === c ? 'opacity-50 cursor-not-allowed' : ''}`} 
+                          style={{ background: "var(--color-input-bg)", color: "var(--color-text-secondary)", border: "1px solid var(--color-border-theme)" }}
+                        >
+                          {addingLang === c ? 'Adding...' : `+ ${name}`}
+                        </button>
+                      ))}
+                    </div>
+                  )}
                 </div>
               </div>
 

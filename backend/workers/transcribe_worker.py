@@ -19,11 +19,12 @@ from fastapi import APIRouter, Request
 from db.supabase_client import (
     get_project, update_job, update_project_status,
     save_transcript, update_project_duration, increment_usage,
-    update_project_file_size, log_activity
+    update_project_file_size, log_activity, create_job
 )
 from services.storage_service import download_file
 from services.ffmpeg_service import extract_audio, get_video_duration, trim_video
 from services.asr_service import transcribe_audio, detect_language
+from services.queue_service import enqueue_translate
 
 router = APIRouter()
 
@@ -38,6 +39,7 @@ async def process_transcription(request: Request):
     project_id = body["project_id"]
     job_id = body["job_id"]
     source_language = body.get("source_language")
+    target_language = body.get("target_language")
     trim_start: float = float(body.get("trim_start") or 0.0)
     trim_end: Optional[float] = body.get("trim_end")
     if trim_end is not None:
@@ -94,16 +96,30 @@ async def process_transcription(request: Request):
             update_job(job_id, "processing", progress=85)
 
             # Step 6: Save transcript to database
-            save_transcript(
+            saved_transcript = save_transcript(
                 project_id=project_id,
                 language=source_language,
                 segments=segments,
                 source="asr",
             )
 
-        # Step 7: Update job and project status
+        # Step 7: Update job
         update_job(job_id, "done", progress=100)
-        update_project_status(project_id, "ready")
+        
+        # Step 8: Chain translation if requested
+        if target_language and target_language != source_language:
+            # Create translation job
+            t_job = create_job(project_id, "translate")
+            update_project_status(project_id, "translating")
+            enqueue_translate(
+                project_id=project_id,
+                job_id=t_job["id"],
+                transcript_id=saved_transcript["id"],
+                source_language=source_language,
+                target_language=target_language,
+            )
+        else:
+            update_project_status(project_id, "ready")
 
         # Step 7.5: Increment usage limits and log activity
         try:

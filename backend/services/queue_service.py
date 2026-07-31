@@ -59,7 +59,7 @@ def enqueue_job(
     return response.message_id
 
 
-def enqueue_transcribe(project_id: str, job_id: str, source_language: str = None) -> str:
+def enqueue_transcribe(project_id: str, job_id: str, source_language: str = None, target_language: str = None) -> str:
     """Enqueue a transcription job."""
     payload = {
         "project_id": project_id,
@@ -67,6 +67,8 @@ def enqueue_transcribe(project_id: str, job_id: str, source_language: str = None
     }
     if source_language:
         payload["source_language"] = source_language
+    if target_language:
+        payload["target_language"] = target_language
     return enqueue_job("/workers/transcribe", payload)
 
 

@@ -52,6 +52,10 @@ class TranscribeRequest(BaseModel):
         None,
         description="ISO language code (e.g., 'en', 'hi', 'te'). Auto-detect if omitted."
     )
+    target_language: Optional[str] = Field(
+        None,
+        description="If provided, automatically enqueue a translation job to this language after transcription."
+    )
 
 
 class TranscriptResponse(BaseModel):

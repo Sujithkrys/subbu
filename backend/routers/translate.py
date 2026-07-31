@@ -65,6 +65,11 @@ async def start_translation(
         if not transcripts:
             raise HTTPException(status_code=400, detail="No transcript available. Run transcription first.")
 
+        # Check if target language already exists to prevent duplicates
+        for t in transcripts:
+            if t["language"] == request.target_language:
+                raise HTTPException(status_code=400, detail=f"A transcript for {request.target_language} already exists.")
+
         # Use the first ASR transcript as source, or specified source
         source_transcript = None
         for t in transcripts:
