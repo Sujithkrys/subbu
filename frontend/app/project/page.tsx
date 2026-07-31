@@ -49,6 +49,7 @@ function EditorContent() {
   const [isExporting, setIsExporting] = useState(false);
   const [addingLang, setAddingLang] = useState<string | null>(null);
   const [toast, setToast] = useState("");
+  const [exportOpen, setExportOpen] = useState(false);
   
   const [uploadingVideo, setUploadingVideo] = useState(false);
   const [uploadProgress, setUploadProgress] = useState(0);
