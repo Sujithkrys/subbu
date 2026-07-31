@@ -58,6 +58,52 @@ def split_text_if_needed(text: str, max_length: int = 900) -> list[str]:
         
     return chunks
 
+def _split_segment(text: str, start: float, end: float, max_len: int = 80) -> list[dict]:
+    """Recursively split a segment if its text exceeds max_len."""
+    if len(text) <= max_len:
+        return [{"start": start, "end": end, "text": text}]
+        
+    # Find natural split point near midpoint
+    mid = len(text) // 2
+    
+    # Try to find punctuation near mid
+    split_idx = -1
+    search_radius = min(mid, 30)
+    
+    # Look for punctuation first
+    for i in range(max(0, mid - search_radius), min(len(text), mid + search_radius)):
+        if text[i] in [',', '.', '?', '!', ';', '।']:
+            split_idx = i + 1
+            break
+            
+    # Fallback to space
+    if split_idx == -1:
+        for i in range(mid, 0, -1):
+            if text[i] == ' ':
+                split_idx = i
+                break
+                
+    # Force split if no space/punctuation found
+    if split_idx == -1 or split_idx == 0 or split_idx >= len(text):
+        split_idx = mid
+        
+    part1 = text[:split_idx].strip()
+    part2 = text[split_idx:].strip()
+    
+    # Avoid infinite recursion if strip() didn't reduce length
+    if len(part1) == len(text) or len(part2) == len(text):
+        return [{"start": start, "end": end, "text": text}]
+        
+    # Proportionally split timestamps
+    duration = end - start
+    ratio = len(part1) / max(1, len(text))
+    mid_time = start + (duration * ratio)
+    
+    result = []
+    result.extend(_split_segment(part1, round(start, 3), round(mid_time, 3), max_len))
+    result.extend(_split_segment(part2, round(mid_time, 3), round(end, 3), max_len))
+    return result
+
 async def translate_segments(
     segments: list[dict],
     source_lang: str,
@@ -124,14 +170,13 @@ async def translate_segments(
                 # Fallback to original text on failure
                 translated_chunks.append(chunk)
                 
-        segment_data = {
-            "start": seg["start"],
-            "end": seg["end"],
-            "text": " ".join(translated_chunks)
-        }
-        if has_error:
-            segment_data["translation_failed"] = True
-            
-        translated_segments.append(segment_data)
+        full_text = " ".join(translated_chunks).strip()
+        
+        sub_segments = _split_segment(full_text, seg["start"], seg["end"], 80)
+        
+        for sub_seg in sub_segments:
+            if has_error:
+                sub_seg["translation_failed"] = True
+            translated_segments.append(sub_seg)
             
     return translated_segments

@@ -707,9 +707,9 @@ function EditorContent() {
                   )}
                   
                   {currentCaption && (
-                    <div className={`absolute left-0 right-0 flex justify-center px-6 pointer-events-none z-10 ${
-                        project?.style?.position === 'top' ? 'top-10' :
-                        project?.style?.position === 'center' ? 'top-1/2 -translate-y-1/2' : 'bottom-10'
+                    <div className={`absolute left-0 right-0 flex justify-center pointer-events-none z-10 ${
+                        project?.style?.position === 'top' ? 'top-[15%]' :
+                        project?.style?.position === 'center' ? 'top-1/2 -translate-y-1/2' : 'bottom-[15%]'
                     }`}>
                       <span 
                         key={currentCaption.text} // Force re-render animation on text change
@@ -721,7 +721,14 @@ function EditorContent() {
                           project?.style?.animation_type === 'fade' ? 'animate-pulse' : ''
                         }`} 
                         style={{
-                            ...activePreset.css, 
+                            ...activePreset.css,
+                            fontSize: `${Math.max(parentSize.w * 0.04, 12)}px`,
+                            maxWidth: '85%',
+                            display: '-webkit-box',
+                            WebkitLineClamp: 2,
+                            WebkitBoxOrient: 'vertical',
+                            overflow: 'hidden',
+                            wordWrap: 'break-word',
                             textAlign: "center",
                             fontWeight: project?.style?.bold ? 'bold' : activePreset.css.fontWeight,
                             textShadow: project?.style?.shadow ? '2px 2px 4px rgba(0,0,0,0.8)' : activePreset.css.textShadow,

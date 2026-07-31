@@ -22,7 +22,7 @@ from db.supabase_client import (
 )
 from services.storage_service import download_file, upload_file, generate_download_url
 from services.ffmpeg_service import (
-    generate_srt, generate_vtt, generate_ass, burn_subtitles,
+    generate_srt, generate_vtt, generate_ass, burn_subtitles, get_video_dimensions
 )
 
 router = APIRouter()
@@ -113,6 +113,9 @@ async def process_render(request: Request):
                 r, g, b = hex_color[0:2], hex_color[2:4], hex_color[4:6]
                 ass_color = f"&H00{b}{g}{r}"
 
+                # Get dimensions for relative sizing
+                video_width, video_height = get_video_dimensions(video_path)
+
                 generate_ass(
                     segments,
                     ass_path,
@@ -122,7 +125,9 @@ async def process_render(request: Request):
                     position=style["position"],
                     animation_type=style.get("animation_type"),
                     bold=style.get("bold", False),
-                    shadow=style.get("shadow", False)
+                    shadow=style.get("shadow", False),
+                    video_width=video_width,
+                    video_height=video_height
                 )
                 update_job(job_id, "processing", progress=50)
 

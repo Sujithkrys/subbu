@@ -64,6 +64,30 @@ def get_video_duration(video_path: str) -> float:
     return float(result.stdout.strip())
 
 
+def get_video_dimensions(video_path: str) -> tuple[int, int]:
+    """Get the width and height of a video file."""
+    cmd = [
+        "ffprobe",
+        "-v", "error",
+        "-select_streams", "v:0",
+        "-show_entries", "stream=width,height",
+        "-of", "csv=s=x:p=0",
+        video_path,
+    ]
+
+    result = subprocess.run(cmd, capture_output=True, text=True, timeout=30)
+    if result.returncode != 0:
+        print(f"Warning: FFprobe dimensions failed: {result.stderr}")
+        return 1920, 1080
+        
+    try:
+        w, h = map(int, result.stdout.strip().split("x"))
+        return w, h
+    except Exception as e:
+        print(f"Warning: Could not parse video dimensions: {e}")
+        return 1920, 1080
+
+
 def trim_video(
     video_path: str,
     output_path: str,
@@ -226,13 +250,15 @@ def generate_ass(
     segments: list[dict],
     output_path: str,
     font_name: str = "Arial",
-    font_size: int = 24,
+    font_size: int = 24, # Kept for backward compatibility, but overridden
     primary_color: str = "&H00FFFFFF",
     outline_color: str = "&H00000000",
     position: str = "bottom",
     animation_type: str = None,
     bold: bool = False,
     shadow: bool = False,
+    video_width: int = 1920,
+    video_height: int = 1080,
 ) -> str:
     """Generate an ASS (Advanced SubStation Alpha) subtitle file."""
     # Map position to alignment
@@ -253,16 +279,29 @@ def generate_ass(
     if font_name in ["MontserratBlack", "MontserratBold", "Impact"]:
         ass_bold = "-1"
 
+    # Dynamic styling relative to video size
+    play_res_x = video_width
+    play_res_y = video_height
+    
+    # Font size ~4.5% of frame width
+    dynamic_font_size = int(max(play_res_x * 0.045, 12))
+    
+    # Margin ~7.5% for left and right (ensures 85% bounded box)
+    margin_lr = int(play_res_x * 0.075)
+    
+    # MarginV ~15% from bottom/top
+    margin_v = int(play_res_y * 0.15)
+
     header = f"""[Script Info]
 Title: AI Subtitle Generator
 ScriptType: v4.00+
-WrapStyle: 0
-PlayResX: 1920
-PlayResY: 1080
+WrapStyle: 1
+PlayResX: {play_res_x}
+PlayResY: {play_res_y}
 
 [V4+ Styles]
 Format: Name, Fontname, Fontsize, PrimaryColour, SecondaryColour, OutlineColour, BackColour, Bold, Italic, Underline, StrikeOut, ScaleX, ScaleY, Spacing, Angle, BorderStyle, Outline, Shadow, Alignment, MarginL, MarginR, MarginV, Encoding
-Style: Default,{font_name},{font_size},{primary_color},&H000000FF,{outline_color},&H80000000,{ass_bold},0,0,0,100,100,0,0,1,2,{ass_shadow},{alignment},20,20,40,1
+Style: Default,{font_name},{dynamic_font_size},{primary_color},&H000000FF,{outline_color},&H80000000,{ass_bold},0,0,0,100,100,0,0,1,2,{ass_shadow},{alignment},{margin_lr},{margin_lr},{margin_v},1
 
 [Events]
 Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text

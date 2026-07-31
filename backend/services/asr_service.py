@@ -166,7 +166,7 @@ def _transcribe_single_file(audio_path: str, language_code: str, word_timestamps
             current_segment["end"] = round(e, 3)
             
             pause = starts[i+1] - e if i + 1 < len(words) else 0
-            if pause > 0.5 or len(current_segment["words"]) >= 15:
+            if pause > 0.5 or len(current_segment["words"]) >= 8:
                 current_segment["text"] = " ".join([w["word"] for w in current_segment["words"]])
                 if not word_timestamps:
                     current_segment.pop("words", None)
