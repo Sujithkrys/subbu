@@ -40,7 +40,6 @@ function EditorContent() {
   
   const [tool, setTool] = useState<"cloning" | "captions" | "style">("captions");
   const [lang, setLang] = useState<string>("");
-  const [sourceLang, setSourceLang] = useState<string>("");
   const [hasVoiceSample, setHasVoiceSample] = useState(false);
   const [activeCloneLang, setActiveCloneLang] = useState<string | null>(null);
   const [clones, setClones] = useState<Record<string, any>>({});
@@ -462,7 +461,6 @@ function EditorContent() {
                     </div>
                   )}
                 </div>
-              </div>
 
               <div className="flex-1 space-y-2 pb-10">
                 {captions.map((c, i) => (
