@@ -106,6 +106,7 @@ async def translate_segments(
         for chunk in chunks:
             try:
                 def do_translate(c):
+                    print(f"[DIAGNOSTIC TRANSLATION] Sending to Sarvam:\n  input: '{c}'\n  source: {source_lang_code}\n  target: {target_lang_code}\n  mode: {translation_mode}")
                     return client.text.translate(
                         input=c,
                         source_language_code=source_lang_code,
