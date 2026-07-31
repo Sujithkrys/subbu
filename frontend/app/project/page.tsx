@@ -112,7 +112,7 @@ function EditorContent() {
       }
 
       // Check for voice sample
-      const { data: settingsData } = await sb.from("user_settings").select("voice_sample_url").eq("user_id", user.id).single();
+      const { data: settingsData } = await sb.from("user_settings").select("voice_sample_url").eq("user_id", user.id).maybeSingle();
       if (settingsData && settingsData.voice_sample_url) {
         setHasVoiceSample(true);
       } else {
@@ -478,6 +478,11 @@ function EditorContent() {
                     <div className="mb-1 flex items-center justify-between">
                       <span className="text-[10px]" style={{ color: currentCaption === c ? "var(--color-accent)" : "var(--color-text-muted)" }}>
                         {fmt(c.start)} → {fmt(c.end)} {currentCaption === c && "· now playing"}
+                        {(c as any).translation_failed && (
+                          <span className="ml-2 text-red-500 font-bold" title="Translation failed, showing original text">
+                            ⚠️ Translation Failed
+                          </span>
+                        )}
                       </span>
                       <Trash2 size={12} style={{ color: "var(--color-text-muted)" }} onClick={(e) => { e.stopPropagation(); removeCaption(i); }} />
                     </div>

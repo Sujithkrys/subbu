@@ -101,6 +101,7 @@ async def translate_segments(
         # Check character limit
         chunks = split_text_if_needed(original_text, 900)
         translated_chunks = []
+        has_error = False
         
         for chunk in chunks:
             try:
@@ -118,13 +119,18 @@ async def translate_segments(
                 translated_chunks.append(response.translated_text)
             except Exception as e:
                 print(f"Translation error for chunk '{chunk}': {e}")
+                has_error = True
                 # Fallback to original text on failure
                 translated_chunks.append(chunk)
                 
-        translated_segments.append({
+        segment_data = {
             "start": seg["start"],
             "end": seg["end"],
             "text": " ".join(translated_chunks)
-        })
+        }
+        if has_error:
+            segment_data["translation_failed"] = True
+            
+        translated_segments.append(segment_data)
             
     return translated_segments

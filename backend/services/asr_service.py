@@ -75,20 +75,61 @@ def transcribe_audio(
             if lang_code in lang_map.values():
                 language_code = lang_code
 
-    # Diagnostics
+    from services.ffmpeg_service import get_video_duration
+    import subprocess
+    import tempfile
+    import glob
     import os
-    import wave
-    file_size = os.path.getsize(audio_path)
+    
     try:
-        with wave.open(audio_path, 'rb') as w:
-            frames = w.getnframes()
-            rate = w.getframerate()
-            duration = frames / float(rate)
-    except Exception:
-        duration = -1
+        duration = get_video_duration(audio_path)
+    except Exception as e:
+        print(f"[DIAGNOSTIC] Could not get duration, assuming short. Error: {e}")
+        duration = 0
+        
+    print(f"[DIAGNOSTIC] Calling STT. Audio: {audio_path}, Duration: {duration}s, Lang: {language_code}")
+    
+    if duration <= 25:
+        return _transcribe_single_file(audio_path, language_code, word_timestamps, language)
+        
+    print("[DIAGNOSTIC] Audio >25s, chunking into 20s segments...")
+    
+    all_segments = []
+    
+    with tempfile.TemporaryDirectory() as tmpdir:
+        chunk_pattern = os.path.join(tmpdir, "chunk_%03d.wav")
+        cmd = [
+            "ffmpeg", "-y", "-i", audio_path,
+            "-f", "segment", "-segment_time", "20",
+            "-c", "copy", chunk_pattern
+        ]
+        res = subprocess.run(cmd, capture_output=True, text=True)
+        if res.returncode != 0:
+            print(f"[ERROR] Chunking failed: {res.stderr}")
+            # Fallback to direct call, though it might fail/garble
+            return _transcribe_single_file(audio_path, language_code, word_timestamps, language)
+            
+        chunks = sorted(glob.glob(os.path.join(tmpdir, "chunk_*.wav")))
+        for i, chunk_file in enumerate(chunks):
+            chunk_start_offset = i * 20.0
+            print(f"[DIAGNOSTIC] Transcribing chunk {i}: {chunk_file} (offset {chunk_start_offset}s)")
+            
+            chunk_segments = _transcribe_single_file(chunk_file, language_code, word_timestamps, language)
+            
+            # Adjust timestamps
+            for seg in chunk_segments:
+                seg["start"] = round(seg["start"] + chunk_start_offset, 3)
+                seg["end"] = round(seg["end"] + chunk_start_offset, 3)
+                if "words" in seg:
+                    for w in seg["words"]:
+                        w["start"] = round(w["start"] + chunk_start_offset, 3)
+                        w["end"] = round(w["end"] + chunk_start_offset, 3)
+                all_segments.append(seg)
+                
+    return all_segments
 
-    print(f"[DIAGNOSTIC] Calling Sarvam STT. Audio: {audio_path}, Size: {file_size} bytes, Duration: {duration}s, Lang: {language_code}")
-
+def _transcribe_single_file(audio_path: str, language_code: str, word_timestamps: bool, language: Optional[str]) -> list[dict]:
+    client = get_sarvam_client()
     try:
         with open(audio_path, "rb") as audio_file:
             response = client.speech_to_text.transcribe(
