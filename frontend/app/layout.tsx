@@ -19,7 +19,7 @@ export const metadata: Metadata = {
     "Tamil subtitles",
   ],
   icons: {
-    icon: '/logo.png',
+    icon: '/logo.svg',
   },
 };
 

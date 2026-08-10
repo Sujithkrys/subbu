@@ -1,7 +1,6 @@
 "use client";
 
 import { usePathname, useRouter } from "next/navigation";
-import Image from "next/image";
 import { LayoutDashboard, Clapperboard, Settings as SettingsIcon, PanelLeft } from "lucide-react";
 import { useSidebar } from "@/components/SidebarContext";
 
@@ -32,18 +31,17 @@ export default function Sidebar() {
       {collapsed ? (
         <button
           onClick={() => setCollapsed(false)}
-          className="mb-8 flex h-9 w-9 items-center justify-center self-center rounded-xl transition-transform hover:scale-105 overflow-hidden shadow-sm"
+          className="mb-8 flex h-9 w-9 items-center justify-center self-center rounded-xl text-base font-semibold text-white transition-transform hover:scale-105"
+          style={{ background: "var(--color-accent)" }}
           title="Expand sidebar"
         >
-          <Image src="/logo.png" alt="Subbu" width={36} height={36} className="object-cover" />
+          సు
         </button>
       ) : (
         <div className="mb-8 flex items-center justify-between px-1">
           <div className="flex items-center gap-2.5">
-            <div className="flex h-9 w-9 items-center justify-center rounded-xl overflow-hidden shadow-sm">
-              <Image src="/logo.png" alt="Subbu" width={36} height={36} className="object-cover" />
-            </div>
-            <span className="text-lg font-semibold tracking-tight" style={{ color: "var(--color-text-primary)" }}>Subbu</span>
+            <div className="flex h-9 w-9 items-center justify-center rounded-xl text-base font-semibold text-white" style={{ background: "var(--color-accent)" }}>సు</div>
+            <span className="text-lg font-semibold" style={{ color: "var(--color-text-primary)" }}>Subbu</span>
           </div>
           <button
             onClick={() => setCollapsed(true)}
