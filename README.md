@@ -1,6 +1,6 @@
-# 🎬 SubGen — AI Subtitle & Voice Cloning Platform
+# 🎬 Subbu — AI Subtitle & Voice Cloning Platform
 
-SubGen is an AI-powered subtitle generation, translation, and voice cloning platform built specifically for Indian languages. Upload a video, get instant transcription via Groq's Whisper API, translate subtitles into 10+ Indic languages via Google Gemini API, generate natural-sounding voiceovers using Sarvam AI, customize your subtitle styles, and export your video in a single click.
+Subbu is an AI-powered subtitle generation, translation, and voice cloning platform built specifically for Indian languages. Upload a video, get instant transcription via Groq's Whisper API, translate subtitles into 10+ Indic languages via Google Gemini API, generate natural-sounding voiceovers using Sarvam AI, customize your subtitle styles, and export your video in a single click.
 
 ## ✨ Key Features
 
@@ -93,7 +93,7 @@ SubGen is an AI-powered subtitle generation, translation, and voice cloning plat
 
 ## 🗣 Supported Languages
 
-SubGen currently supports transcription, translation, and voice cloning in the following languages:
+Subbu currently supports transcription, translation, and voice cloning in the following languages:
 
 | Language | Code | | Language | Code |
 |----------|------|-|----------|------|
@@ -120,7 +120,7 @@ SubGen currently supports transcription, translation, and voice cloning in the f
 
 ## 📦 Export Capabilities
 
-SubGen gives creators the flexibility to export their processed videos in the way that best fits their workflow:
+Subbu gives creators the flexibility to export their processed videos in the way that best fits their workflow:
 - **SRT (.srt)**: The universally compatible standard subtitle format.
 - **VTT (.vtt)**: Optimized for HTML5 web players.
 - **ASS (.ass)**: Advanced SubStation Alpha for retaining highly customized styles, fonts, and colors.

@@ -6,7 +6,7 @@ import { SidebarProvider } from "@/components/SidebarContext";
 import SettingsModal from "@/components/SettingsModal";
 
 export const metadata: Metadata = {
-  title: "SubGen — AI Subtitle Generator",
+  title: "Subbu — AI Subtitle Generator",
   description:
     "Generate AI-powered subtitles for your videos. Translate into Telugu, Hindi, Tamil, and all major Indian languages. Export as SRT, VTT, ASS, or burned-in MP4.",
   keywords: [
