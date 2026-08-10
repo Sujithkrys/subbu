@@ -17,7 +17,7 @@ router = APIRouter()
 
 def _extract_user_id(authorization: str) -> str:
     """Bypass authentication for Guest user."""
-    return "84fef9af-b2ca-4286-83d2-56df1cb71bb7"
+    return "3bb7971f-c3f7-4d59-82b5-16a0ffc5422c"
 
 
 @router.post("/{project_id}/transcribe")

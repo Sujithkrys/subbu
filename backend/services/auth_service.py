@@ -6,4 +6,4 @@ def get_current_user(authorization: str = Header(...)) -> dict:
     """
     Bypass authentication for Guest user.
     """
-    return {"id": "84fef9af-b2ca-4286-83d2-56df1cb71bb7"}
+    return {"id": "3bb7971f-c3f7-4d59-82b5-16a0ffc5422c"}
