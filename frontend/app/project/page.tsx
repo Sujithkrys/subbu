@@ -85,10 +85,11 @@ function EditorContent() {
       const { createClient } = await import("@/lib/supabaseClient");
       const sb = createClient();
       const { data: { user } } = await sb.auth.getUser();
-      if (!user) {
-        router.push("/login");
-        return;
-      }
+      // Guest mode bypass: do not redirect
+      // if (!user) {
+      //   router.push("/login");
+      //   return;
+      // }
 
       if (!projectId) {
         setProject(null);
@@ -111,13 +112,15 @@ function EditorContent() {
         });
       }
 
-      // Check for voice sample
-      const { data: settingsData } = await sb.from("user_settings").select("voice_sample_url").eq("user_id", user.id).maybeSingle();
-      if (settingsData && settingsData.voice_sample_url) {
-        setHasVoiceSample(true);
-      } else {
-        setHasVoiceSample(false);
+      // Check for voice sample (only if user exists, else guest mode)
+      let hasSample = false;
+      if (user) {
+        const { data: settingsData } = await sb.from("user_settings").select("voice_sample_url").eq("user_id", user.id).maybeSingle();
+        if (settingsData && settingsData.voice_sample_url) {
+          hasSample = true;
+        }
       }
+      setHasVoiceSample(hasSample);
     } catch (err) {
       console.error(err);
       fireToast("Failed to load project");
