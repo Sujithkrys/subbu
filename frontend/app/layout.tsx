@@ -4,6 +4,7 @@ import Sidebar from "@/components/Sidebar";
 import ThemeProvider from "@/components/ThemeProvider";
 import { SidebarProvider } from "@/components/SidebarContext";
 import SettingsModal from "@/components/SettingsModal";
+import AboutModal from "@/components/AboutModal";
 
 export const metadata: Metadata = {
   title: "Subbu — AI Subtitle Generator",
@@ -51,6 +52,7 @@ export default function RootLayout({
                 {children}
               </main>
               <SettingsModal />
+              <AboutModal />
             </div>
           </SidebarProvider>
         </ThemeProvider>
