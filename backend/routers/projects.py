@@ -37,7 +37,7 @@ def _extract_user_id_from_token(authorization: str) -> str:
     """
     Bypass authentication for Guest user.
     """
-    return "00000000-0000-0000-0000-000000000000"
+    return "84fef9af-b2ca-4286-83d2-56df1cb71bb7"
 
 
 @router.post("", response_model=CreateProjectResponse)
