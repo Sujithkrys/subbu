@@ -59,6 +59,30 @@ async def start_voice_clone(project_id: str, lang: str, req: CloneStartRequest, 
         traceback.print_exc()
         raise HTTPException(status_code=500, detail=f"Internal Server Error: {str(e)}")
 
+@router.get("/{project_id}/clones")
+async def get_project_clones(project_id: str, user: dict = Depends(get_current_user)):
+    sb = get_supabase()
+    res = sb.table("projects").select("id").eq("id", project_id).eq("user_id", user["id"]).execute()
+    if not res.data:
+        raise HTTPException(status_code=404, detail="Project not found")
+        
+    clones_res = sb.table("voice_clones").select("*").eq("project_id", project_id).execute()
+    return clones_res.data or []
+
+@router.get("/{project_id}/clone/{lang}/status")
+async def get_clone_status_endpoint(project_id: str, lang: str, user: dict = Depends(get_current_user)):
+    sb = get_supabase()
+    res = sb.table("projects").select("id").eq("id", project_id).eq("user_id", user["id"]).execute()
+    if not res.data:
+        raise HTTPException(status_code=404, detail="Project not found")
+        
+    clone_res = sb.table("voice_clones").select("*").eq("project_id", project_id).eq("language", lang).execute()
+    if not clone_res.data:
+        return {"status": "not_started"}
+        
+    return clone_res.data[0]
+
+
 
 async def process_voice_clone(clone_id: str, project_id: str, lang: str, user_id: str, speaker: str = None):
     """Background task to interact with Sarvam API"""
