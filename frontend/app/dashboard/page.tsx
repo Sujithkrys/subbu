@@ -22,11 +22,8 @@ function DashboardContent() {
         const sb = createClient();
         const { data: { user } } = await sb.auth.getUser();
         if (!user) {
-          router.push("/login");
-          return;
-        }
-        
-        if (user?.user_metadata?.full_name) {
+          setUserName("Guest User");
+        } else if (user?.user_metadata?.full_name) {
           setUserName(user.user_metadata.full_name);
         } else if (user?.email) {
           setUserName(user.email.split("@")[0]);

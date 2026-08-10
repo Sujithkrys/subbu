@@ -35,23 +35,9 @@ def _get_user_id(authorization: str = Header(...)) -> str:
 
 def _extract_user_id_from_token(authorization: str) -> str:
     """
-    Extract user_id from Supabase JWT token.
-    In production, verify and decode the JWT. For development,
-    we'll use the Supabase client to verify.
+    Bypass authentication for Guest user.
     """
-    import os
-    from supabase import create_client
-    
-    token = authorization.replace("Bearer ", "")
-    sb = create_client(
-        os.getenv("SUPABASE_URL"),
-        os.getenv("SUPABASE_ANON_KEY"),
-    )
-    try:
-        user = sb.auth.get_user(token)
-        return user.user.id
-    except Exception:
-        raise HTTPException(status_code=401, detail="Invalid or expired token")
+    return "00000000-0000-0000-0000-000000000000"
 
 
 @router.post("", response_model=CreateProjectResponse)

@@ -27,7 +27,10 @@ async function getAuthHeaders(): Promise<Record<string, string>> {
   } = await supabase.auth.getSession();
 
   if (!session?.access_token) {
-    throw new Error("Not authenticated");
+    return {
+      Authorization: `Bearer guest-token`,
+      "Content-Type": "application/json",
+    };
   }
 
   return {

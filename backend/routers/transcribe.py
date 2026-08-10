@@ -16,14 +16,8 @@ router = APIRouter()
 
 
 def _extract_user_id(authorization: str) -> str:
-    """Extract user_id from Supabase JWT token."""
-    token = authorization.replace("Bearer ", "")
-    sb = create_client(os.getenv("SUPABASE_URL"), os.getenv("SUPABASE_ANON_KEY"))
-    try:
-        user = sb.auth.get_user(token)
-        return user.user.id
-    except Exception:
-        raise HTTPException(status_code=401, detail="Invalid or expired token")
+    """Bypass authentication for Guest user."""
+    return "00000000-0000-0000-0000-000000000000"
 
 
 @router.post("/{project_id}/transcribe")
