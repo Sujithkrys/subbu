@@ -18,6 +18,9 @@ export const metadata: Metadata = {
     "Hindi subtitles",
     "Tamil subtitles",
   ],
+  icons: {
+    icon: '/logo.png',
+  },
 };
 
 export default function RootLayout({
