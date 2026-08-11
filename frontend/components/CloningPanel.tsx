@@ -61,7 +61,12 @@ export default function CloningPanel({
     try {
       const res = await getClones(projectId);
       const cloneMap: Record<string, any> = {};
-      res.forEach((c: any) => { cloneMap[c.language] = c; });
+      res.forEach((c: any) => { 
+        cloneMap[c.language] = c; 
+        if (c.status === "cloning") {
+          pollStatus(c.language);
+        }
+      });
       setClones(cloneMap);
       onClonesChange(cloneMap);
     } catch (err) {

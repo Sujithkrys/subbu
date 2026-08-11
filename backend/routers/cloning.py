@@ -61,16 +61,24 @@ async def start_voice_clone(project_id: str, lang: str, req: CloneStartRequest, 
 
 @router.get("/{project_id}/clones")
 async def get_project_clones(project_id: str, user: dict = Depends(get_current_user)):
+    from services.storage_service import generate_download_url
     sb = get_supabase()
     res = sb.table("projects").select("id").eq("id", project_id).eq("user_id", user["id"]).execute()
     if not res.data:
         raise HTTPException(status_code=404, detail="Project not found")
         
     clones_res = sb.table("voice_clones").select("*").eq("project_id", project_id).execute()
-    return clones_res.data or []
+    clones = clones_res.data or []
+    for clone in clones:
+        if clone.get("dubbed_video_url"):
+            clone["dubbed_video_url"] = generate_download_url(clone["dubbed_video_url"])
+        if clone.get("ready_audio_url"):
+            clone["ready_audio_url"] = generate_download_url(clone["ready_audio_url"])
+    return clones
 
 @router.get("/{project_id}/clone/{lang}/status")
 async def get_clone_status_endpoint(project_id: str, lang: str, user: dict = Depends(get_current_user)):
+    from services.storage_service import generate_download_url
     sb = get_supabase()
     res = sb.table("projects").select("id").eq("id", project_id).eq("user_id", user["id"]).execute()
     if not res.data:
@@ -80,7 +88,12 @@ async def get_clone_status_endpoint(project_id: str, lang: str, user: dict = Dep
     if not clone_res.data:
         return {"status": "not_started"}
         
-    return clone_res.data[0]
+    clone = clone_res.data[0]
+    if clone.get("dubbed_video_url"):
+        clone["dubbed_video_url"] = generate_download_url(clone["dubbed_video_url"])
+    if clone.get("ready_audio_url"):
+        clone["ready_audio_url"] = generate_download_url(clone["ready_audio_url"])
+    return clone
 
 
 
@@ -277,29 +290,3 @@ async def process_voice_clone(clone_id: str, project_id: str, lang: str, user_id
         }).eq("id", clone_id).execute()
 
 
-@router.get("/{project_id}/clone/{lang}/status")
-async def get_voice_clone_status(project_id: str, lang: str, user: dict = Depends(get_current_user)):
-    from services.storage_service import generate_download_url
-    sb = get_supabase()
-    res = sb.table("voice_clones").select("*").eq("project_id", project_id).eq("language", lang).execute()
-    if not res.data:
-        return {"status": "not_started"}
-    clone = res.data[0]
-    if clone.get("dubbed_video_url"):
-        clone["dubbed_video_url"] = generate_download_url(clone["dubbed_video_url"])
-    if clone.get("ready_audio_url"):
-        clone["ready_audio_url"] = generate_download_url(clone["ready_audio_url"])
-    return clone
-
-@router.get("/{project_id}/clones")
-async def get_voice_clones(project_id: str, user: dict = Depends(get_current_user)):
-    from services.storage_service import generate_download_url
-    sb = get_supabase()
-    res = sb.table("voice_clones").select("*").eq("project_id", project_id).execute()
-    clones = res.data
-    for clone in clones:
-        if clone.get("dubbed_video_url"):
-            clone["dubbed_video_url"] = generate_download_url(clone["dubbed_video_url"])
-        if clone.get("ready_audio_url"):
-            clone["ready_audio_url"] = generate_download_url(clone["ready_audio_url"])
-    return clones
