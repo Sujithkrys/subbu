@@ -71,7 +71,7 @@ function DashboardContent() {
   };
 
   if (loading) {
-    return <main className="flex-1 p-6 flex items-center justify-center"><p style={{color: "var(--color-text-secondary)"}}>Loading...</p></main>;
+    return <main className="flex-1 p-6 flex items-center justify-center"><p style={{color: "var(--color-text-secondary)"}}>please wait for 60 seconds, the server is loading</p></main>;
   }
 
   const totalVideos = metrics?.total_videos || 0;
